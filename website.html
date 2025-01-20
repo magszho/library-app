@@ -17,7 +17,7 @@
 <body>
 <div id="root"></div>
 
-<!-- Our code goes last, with type="text/babel" so Babel transpiles it -->
+<!-- Our code goes last, with type="text/babel" so Babel transpiles it. -->
 <script type="text/babel">
   const { useState, useEffect } = React;
 
@@ -36,7 +36,7 @@
     return now.toISOString().split('T')[0]; // "YYYY-MM-DD"
   }
 
-  // Return Sunday of the current week (so each "Calendar" covers Sunday→Saturday).
+  // Return Sunday of the current week (so "Calendar" covers Sunday→Saturday).
   function getStartOfWeek(date = new Date()) {
     const d = new Date(date);
     const dayOfWeek = d.getDay(); // 0=Sunday,1=Mon,...
@@ -94,7 +94,7 @@
     // Notification
     const [notification, setNotification] = useState(null);
 
-    // Theme system: "light", "dark", "maroon"
+    // Theme system: "light" or "dark"
     const [theme, setTheme] = useState('light');
 
     // For the Calendar tab
@@ -229,25 +229,30 @@
     }
 
     // Theme classes for outer container
+    // Dark theme is now gray/black rather than blue.
     const themeClasses = {
       light: 'bg-gray-100 text-gray-900',
-      dark: 'bg-slate-900 text-white',
-      maroon: 'bg-[#9A2B2B] text-white'
+      dark: 'bg-gray-900 text-gray-100'
     };
 
     // Helper to style background panels
     function getPanelStyle() {
-      if (theme === 'dark') return 'bg-slate-800';
-      if (theme === 'maroon') return 'bg-[#9A2B2B]/75';
-      return 'bg-white';
+      return theme === 'dark' ? 'bg-gray-800' : 'bg-white';
     }
 
-    // Helper to style border
+    // Helper to style border in each theme
     function getBorderStyle() {
-      if (theme === 'dark') return 'border-slate-600';
-      if (theme === 'maroon') return 'border-[#7E1111]';
-      return 'border-gray-200';
+      return theme === 'dark' ? 'border-gray-700' : 'border-gray-200';
     }
+
+    // We’ll use a darker maroon color (#800000) for the primary buttons
+    // (with a hover color #700000) in both themes.
+    function getPrimaryButtonStyle() {
+      return 'bg-[#800000] hover:bg-[#700000] text-white';
+    }
+
+    // Active tab styling can also be a darker maroon border, if you want
+    const activeTabStyle = 'border-b-2 border-[#800000] text-[#800000]';
 
     return (
       <div className={`min-h-screen ${themeClasses[theme]}`}>
@@ -264,7 +269,6 @@
               >
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
-                <option value="maroon">Maroon</option>
               </select>
             </div>
           </div>
@@ -275,9 +279,7 @@
               <button
                 onClick={() => setActiveTab('rooms')}
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'rooms'
-                    ? 'border-b-2 border-red-800 text-red-800'
-                    : 'hover:text-gray-700'
+                  activeTab === 'rooms' ? activeTabStyle : 'hover:text-gray-700'
                 }`}
               >
                 Room Availability
@@ -285,9 +287,7 @@
               <button
                 onClick={() => setActiveTab('myreservations')}
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'myreservations'
-                    ? 'border-b-2 border-red-800 text-red-800'
-                    : 'hover:text-gray-700'
+                  activeTab === 'myreservations' ? activeTabStyle : 'hover:text-gray-700'
                 }`}
               >
                 My Reservations
@@ -295,9 +295,7 @@
               <button
                 onClick={() => setActiveTab('calendar')}
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'calendar'
-                    ? 'border-b-2 border-red-800 text-red-800'
-                    : 'hover:text-gray-700'
+                  activeTab === 'calendar' ? activeTabStyle : 'hover:text-gray-700'
                 }`}
               >
                 Calendar
@@ -305,9 +303,7 @@
               <button
                 onClick={() => setActiveTab('rules')}
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'rules'
-                    ? 'border-b-2 border-red-800 text-red-800'
-                    : 'hover:text-gray-700'
+                  activeTab === 'rules' ? activeTabStyle : 'hover:text-gray-700'
                 }`}
               >
                 Rules & Guidelines
@@ -347,11 +343,7 @@
                             <div
                               key={res.id}
                               className={`p-2 rounded-md text-sm mb-2 ${
-                                theme === 'dark'
-                                  ? 'bg-slate-700'
-                                  : theme === 'maroon'
-                                  ? 'bg-[#9A2B2B]/50'
-                                  : 'bg-gray-50'
+                                theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
                               }`}
                             >
                               Period {res.period} is reserved
@@ -456,11 +448,7 @@
 
                   <button
                     type="submit"
-                    className={`w-full mt-4 p-2 rounded-md text-white ${
-                      theme === 'maroon'
-                        ? 'bg-red-900 hover:bg-red-800'
-                        : 'bg-red-700 hover:bg-red-600'
-                    }`}
+                    className={`w-full mt-4 p-2 rounded-md ${getPrimaryButtonStyle()}`}
                   >
                     Book Room
                   </button>
@@ -501,10 +489,8 @@
                           key={res.id}
                           className={`p-4 border rounded-lg flex justify-between items-center ${
                             theme === 'dark'
-                              ? `bg-slate-700 ${getBorderStyle()}`
-                              : theme === 'maroon'
-                              ? `bg-[#9A2B2B]/50 ${getBorderStyle()}`
-                              : 'bg-gray-50 border-gray-200'
+                              ? `bg-gray-700 ${getBorderStyle()}`
+                              : `bg-gray-50 border-gray-200`
                           }`}
                         >
                           <div>
@@ -516,11 +502,7 @@
                           </div>
                           <button
                             onClick={() => cancelReservation(res.id)}
-                            className={`px-4 py-2 rounded-md text-white ${
-                              theme === 'maroon'
-                                ? 'bg-red-600 hover:bg-red-500'
-                                : 'bg-red-500 hover:bg-red-400'
-                            }`}
+                            className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
                           >
                             Cancel
                           </button>
@@ -544,11 +526,7 @@
               <div className={`rounded-md shadow p-4 flex justify-between items-center ${getPanelStyle()}`}>
                 <button
                   onClick={prevWeek}
-                  className={`px-3 py-1 rounded-md text-white ${
-                    theme === 'maroon'
-                      ? 'bg-red-900 hover:bg-red-800'
-                      : 'bg-red-700 hover:bg-red-600'
-                  }`}
+                  className={`px-3 py-1 rounded-md ${getPrimaryButtonStyle()}`}
                 >
                   ‹ Prev
                 </button>
@@ -557,11 +535,7 @@
                 </h2>
                 <button
                   onClick={nextWeek}
-                  className={`px-3 py-1 rounded-md text-white ${
-                    theme === 'maroon'
-                      ? 'bg-red-900 hover:bg-red-800'
-                      : 'bg-red-700 hover:bg-red-600'
-                  }`}
+                  className={`px-3 py-1 rounded-md ${getPrimaryButtonStyle()}`}
                 >
                   Next ›
                 </button>
