@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Room Reservation System - Light Only</title>
+  <title>Room Reservation System - Date Picker Style</title>
 
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -11,41 +11,63 @@
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 
-  <!-- Babel for on-the-fly JSX transform in the browser -->
+  <!-- Babel for on-the-fly JSX transform -->
   <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+
+  <!-- Small CSS override for date input -->
+  <style>
+    /* Force black text for the visible (month, day, year) parts in Chrome-like browsers */
+    input[type="date"] {
+      color-scheme: light; /* Ensures it doesn't switch to a "dark" scheme internally */
+      color: black;        /* Fallback for general text */
+    }
+    /* Force each part of the date to be black */
+    input[type="date"]::-webkit-datetime-edit {
+      color: black;
+    }
+    input[type="date"]::-webkit-datetime-edit-text,
+    input[type="date"]::-webkit-datetime-edit-month-field,
+    input[type="date"]::-webkit-datetime-edit-day-field,
+    input[type="date"]::-webkit-datetime-edit-year-field {
+      color: black !important;
+    }
+
+    /* We do NOT override the "disabled" or "out of range" color, 
+       so invalid dates still appear grayed. */
+    /* The user won't be able to select them anyway due to `min` and `max`. */
+  </style>
 </head>
 <body>
 <div id="root"></div>
 
-<!-- Our code goes last, with type="text/babel" so Babel transpiles it. -->
 <script type="text/babel">
   const { useState, useEffect } = React;
 
-  // --- Helpers ---
+  // --- Date Helpers ---
 
-  // Parse "YYYY-MM-DD" as a *local* date (avoids off-by-one bug in some time zones).
+  // Parse "YYYY-MM-DD" as local date (avoids UTC shift bug).
   function parseLocalDate(dateStr) {
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year, month - 1, day);
   }
 
-  // Return a local "today" date in YYYY-MM-DD format (for filtering).
+  // Return today's date in "YYYY-MM-DD" (local midnight).
   function getTodayStr() {
     const now = new Date();
-    now.setHours(0, 0, 0, 0); // local midnight
-    return now.toISOString().split('T')[0]; // "YYYY-MM-DD"
+    now.setHours(0, 0, 0, 0);
+    return now.toISOString().split('T')[0];
   }
 
-  // Return Sunday of the current week (so "Calendar" covers Sunday→Saturday).
+  // Return Sunday of the current week (used for weekly calendar).
   function getStartOfWeek(date = new Date()) {
     const d = new Date(date);
-    const dayOfWeek = d.getDay(); // 0=Sunday,1=Mon,...
+    const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ...
     d.setDate(d.getDate() - dayOfWeek);
     d.setHours(0, 0, 0, 0);
     return d;
   }
 
-  // Given a Sunday "weekStart", return an array of 7 Date objects (Sun->Sat).
+  // Generate 7 days from a "week start" (Sun->Sat).
   function getWeekDates(weekStart) {
     const dates = [];
     for (let i = 0; i < 7; i++) {
@@ -56,15 +78,15 @@
     return dates;
   }
 
-  // Format day-of-week header in the Calendar (e.g., "Sun 1/22").
+  // Format day-of-week header (e.g., "Sun 1/22").
   function formatDayHeader(dateObj) {
-    const dow = dateObj.toLocaleString('en-US', { weekday: 'short' }); // "Sun", "Mon", etc.
+    const dow = dateObj.toLocaleString('en-US', { weekday: 'short' });
     const month = dateObj.getMonth() + 1;
     const day = dateObj.getDate();
     return `${dow} ${month}/${day}`;
   }
 
-  // Format the week start in something like "Jan 22, 2025".
+  // Format the "week start" for display (e.g., "Jan 22, 2025").
   function formatWeekStart(dateObj) {
     return dateObj.toLocaleDateString('en-US', {
       month: 'short',
@@ -73,15 +95,14 @@
     });
   }
 
-  // --- Main Component ---
   function ConferenceRoomSystem() {
     // Tabs
     const [activeTab, setActiveTab] = useState('rooms');
 
-    // Reservations (persisted in localStorage)
+    // Reservations (localStorage)
     const [reservations, setReservations] = useState([]);
 
-    // Form data for booking
+    // Booking form data
     const [formData, setFormData] = useState({
       room: '',
       date: '',
@@ -94,14 +115,21 @@
     // Notification
     const [notification, setNotification] = useState(null);
 
-    // For the Calendar tab
+    // Weekly Calendar
     const [currentWeekStart, setCurrentWeekStart] = useState(getStartOfWeek());
 
     // Constants
     const rooms = ['A', 'B', 'C', 'D'];
     const periods = Array.from({ length: 8 }, (_, i) => (i + 1).toString());
 
-    // Load from localStorage on mount
+    // Date constraints
+    const todayStr = getTodayStr();
+    const todayObj = parseLocalDate(todayStr);
+    const maxDateObj = new Date(todayObj);
+    maxDateObj.setDate(maxDateObj.getDate() + 10); // 10 days in future
+    const maxDateStr = maxDateObj.toISOString().split('T')[0];
+
+    // Load from localStorage
     useEffect(() => {
       const stored = localStorage.getItem('reservations');
       if (stored) {
@@ -116,23 +144,20 @@
       }
     }, []);
 
-    // Save to localStorage whenever reservations change
+    // Save whenever reservations change
     useEffect(() => {
       localStorage.setItem('reservations', JSON.stringify(reservations));
     }, [reservations]);
 
-    // Notification helper
     function showNotification(message, type = 'success') {
       setNotification({ message, type });
       setTimeout(() => setNotification(null), 5000);
     }
 
-    // Handle input changes
     function handleChange(field, value) {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
 
-    // Submit booking
     function handleSubmit(e) {
       e.preventDefault();
       const cleanedData = {
@@ -154,19 +179,35 @@
         return;
       }
 
-      // Check for double-booking
+      // Date constraints
+      const chosenDate = parseLocalDate(cleanedData.date);
+      if (chosenDate < todayObj) {
+        showNotification('You cannot book a past date', 'error');
+        return;
+      }
+      if (chosenDate > maxDateObj) {
+        showNotification('You can only book up to 10 days in advance', 'error');
+        return;
+      }
+
+      // Double booking check
       const isBooked = reservations.some(
-        r =>
+        r => 
           r.room === cleanedData.room &&
           r.date === cleanedData.date &&
           r.period === cleanedData.period
       );
       if (isBooked) {
-        showNotification('This room is already booked for that date/period', 'error');
+        showNotification('That room is already booked for the chosen date/period', 'error');
         return;
       }
 
-      const newRes = { ...cleanedData, id: Date.now() };
+      // Add reservation with checkIn default to "Pending"
+      const newRes = { 
+        ...cleanedData, 
+        id: Date.now(), 
+        checkedIn: 'Pending'
+      };
       setReservations(prev => [...prev, newRes]);
 
       // Reset
@@ -182,32 +223,24 @@
       showNotification('Reservation successful! Arrive within 10 minutes of period start.');
     }
 
-    // Cancel reservation
     function cancelReservation(id) {
       setReservations(prev => prev.filter(r => r.id !== id));
       showNotification('Reservation cancelled successfully', 'success');
     }
 
-    // "My Reservations" filter
     function myReservations() {
       return reservations
         .filter(r => r.email === formData.email.trim().toLowerCase())
         .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
     }
 
-    // Today’s reservations for the "Rooms" tab
-    const todayStr = getTodayStr();
     function getRoomReservationsToday(room) {
       return reservations
         .filter(r => r.room === room && r.date === todayStr)
-        // sort by period
         .sort((a, b) => parseInt(a.period, 10) - parseInt(b.period, 10));
     }
 
-    // Calendar tab: 7 days (Sun->Sat) from currentWeekStart
-    const weekDates = getWeekDates(currentWeekStart);
-
-    // Next / Prev week
+    // Calendar
     function prevWeek() {
       const newStart = new Date(currentWeekStart);
       newStart.setDate(newStart.getDate() - 7);
@@ -218,16 +251,14 @@
       newStart.setDate(newStart.getDate() + 7);
       setCurrentWeekStart(newStart);
     }
+    const weekDates = getWeekDates(currentWeekStart);
 
-    // For each day+period, find reservations
     function getReservationsForDayAndPeriod(dayDate, period) {
       const dayStr = dayDate.toISOString().split('T')[0];
       return reservations.filter(r => r.date === dayStr && r.period === period);
     }
 
-    // We'll use a single light style for backgrounds
-    // Outer container
-    // Buttons = #800000 with hover #700000
+    // Maroon button style
     function getPrimaryButtonStyle() {
       return 'bg-[#800000] hover:bg-[#700000] text-white';
     }
@@ -235,7 +266,6 @@
     return (
       <div className="min-h-screen bg-gray-100 text-gray-900">
         <div className="p-6 max-w-6xl mx-auto">
-          {/* Title */}
           <h1 className="text-2xl font-bold mb-4">Room Reservation System</h1>
 
           {/* Tabs */}
@@ -288,17 +318,18 @@
           {notification && (
             <div
               className={`mt-4 p-4 rounded-md ${
-                notification.type === 'error' ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'
+                notification.type === 'error'
+                  ? 'bg-red-50 text-red-800'
+                  : 'bg-green-50 text-green-800'
               }`}
             >
               {notification.message}
             </div>
           )}
 
-          {/* 1) ROOMS TAB (Today's Reservations Only) */}
+          {/* ROOMS TAB (Today) */}
           {activeTab === 'rooms' && (
             <div className="mt-4 space-y-8">
-              {/* Room Grid */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {rooms.map(room => {
                   const todaysRes = getRoomReservationsToday(room);
@@ -321,7 +352,6 @@
                 })}
               </div>
 
-              {/* Booking Form */}
               <div className="rounded-md shadow p-4 bg-white">
                 <h2 className="text-lg font-bold mb-4">Book a Room</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -351,6 +381,8 @@
                         className="w-full border border-gray-300 rounded-md p-2"
                         value={formData.date}
                         onChange={(e) => handleChange('date', e.target.value)}
+                        min={todayStr}
+                        max={maxDateStr}
                       />
                     </div>
 
@@ -422,13 +454,12 @@
             </div>
           )}
 
-          {/* 2) MY RESERVATIONS TAB */}
+          {/* MY RESERVATIONS */}
           {activeTab === 'myreservations' && (
             <div className="mt-4">
               <div className="rounded-md shadow p-4 bg-white">
                 <h2 className="text-lg font-bold mb-4">My Current Reservations</h2>
 
-                {/* Email prompt */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium mb-2">
                     Enter your @rpsnj.us email to view/cancel reservations
@@ -452,7 +483,7 @@
                       myReservations().map(res => (
                         <div
                           key={res.id}
-                          className="p-4 border border-gray-200 rounded-lg flex justify-between items-center bg-gray-50"
+                          className="p-4 border border-gray-200 rounded-lg bg-gray-50 flex justify-between items-center"
                         >
                           <div>
                             <p className="font-medium">Room {res.room}</p>
@@ -460,6 +491,15 @@
                               Date: {res.date} | Period: {res.period}
                             </p>
                             <p className="text-sm">People: {res.people}</p>
+                            <p className="text-sm mt-1">
+                              Check-In Status: 
+                              <button
+                                className="ml-2 px-3 py-1 rounded-md bg-gray-300 cursor-default"
+                                disabled
+                              >
+                                {res.checkedIn}
+                              </button>
+                            </p>
                           </div>
                           <button
                             onClick={() => cancelReservation(res.id)}
@@ -480,10 +520,9 @@
             </div>
           )}
 
-          {/* 3) CALENDAR TAB (Weekly) */}
+          {/* CALENDAR TAB (Weekly) */}
           {activeTab === 'calendar' && (
             <div className="mt-4 space-y-4">
-              {/* Header with Prev/Next Week */}
               <div className="rounded-md shadow p-4 bg-white flex justify-between items-center">
                 <button
                   onClick={prevWeek}
@@ -502,7 +541,6 @@
                 </button>
               </div>
 
-              {/* Weekly table: rows = Periods 1..8, columns = the 7 days */}
               <div className="rounded-md shadow overflow-x-auto bg-white">
                 <table className="min-w-full border-collapse">
                   <thead>
@@ -516,7 +554,7 @@
                     </tr>
                   </thead>
                   <tbody>
-                    {periods.map((p) => (
+                    {periods.map(p => (
                       <tr key={p} className="border-b border-gray-200">
                         <td className="p-2 font-medium text-center">Period {p}</td>
                         {weekDates.map((dayDate, colIdx) => {
@@ -546,7 +584,7 @@
             </div>
           )}
 
-          {/* 4) RULES TAB */}
+          {/* RULES TAB */}
           {activeTab === 'rules' && (
             <div className="mt-4 space-y-4">
               <div className="rounded-md shadow p-4 bg-white">
