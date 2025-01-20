@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Room Reservation System - Today + Calendar</title>
+  <title>Room Reservation System - Light Only</title>
 
-  <!-- Tailwind CSS (CDN) -->
+  <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- React MUST load BEFORE ReactDOM -->
@@ -93,9 +93,6 @@
 
     // Notification
     const [notification, setNotification] = useState(null);
-
-    // Theme system: "light" or "dark"
-    const [theme, setTheme] = useState('light');
 
     // For the Calendar tab
     const [currentWeekStart, setCurrentWeekStart] = useState(getStartOfWeek());
@@ -228,58 +225,28 @@
       return reservations.filter(r => r.date === dayStr && r.period === period);
     }
 
-    // Theme classes for outer container
-    // Dark theme is now gray/black rather than blue.
-    const themeClasses = {
-      light: 'bg-gray-100 text-gray-900',
-      dark: 'bg-gray-900 text-gray-100'
-    };
-
-    // Helper to style background panels
-    function getPanelStyle() {
-      return theme === 'dark' ? 'bg-gray-800' : 'bg-white';
-    }
-
-    // Helper to style border in each theme
-    function getBorderStyle() {
-      return theme === 'dark' ? 'border-gray-700' : 'border-gray-200';
-    }
-
-    // We’ll use a darker maroon color (#800000) for the primary buttons
-    // (with a hover color #700000) in both themes.
+    // We'll use a single light style for backgrounds
+    // Outer container
+    // Buttons = #800000 with hover #700000
     function getPrimaryButtonStyle() {
       return 'bg-[#800000] hover:bg-[#700000] text-white';
     }
 
-    // Active tab styling can also be a darker maroon border, if you want
-    const activeTabStyle = 'border-b-2 border-[#800000] text-[#800000]';
-
     return (
-      <div className={`min-h-screen ${themeClasses[theme]}`}>
+      <div className="min-h-screen bg-gray-100 text-gray-900">
         <div className="p-6 max-w-6xl mx-auto">
-          {/* Top bar with theme selector */}
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">Room Reservation System</h1>
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium">Theme:</label>
-              <select
-                className="border border-gray-300 rounded-md p-1"
-                value={theme}
-                onChange={(e) => setTheme(e.target.value)}
-              >
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </select>
-            </div>
-          </div>
+          {/* Title */}
+          <h1 className="text-2xl font-bold mb-4">Room Reservation System</h1>
 
           {/* Tabs */}
-          <div className={`mb-8 border-b ${getBorderStyle()}`}>
+          <div className="mb-8 border-b border-gray-200">
             <nav className="flex space-x-4" aria-label="Tabs">
               <button
                 onClick={() => setActiveTab('rooms')}
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'rooms' ? activeTabStyle : 'hover:text-gray-700'
+                  activeTab === 'rooms'
+                    ? 'border-b-2 border-[#800000] text-[#800000]'
+                    : 'hover:text-gray-700'
                 }`}
               >
                 Room Availability
@@ -287,7 +254,9 @@
               <button
                 onClick={() => setActiveTab('myreservations')}
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'myreservations' ? activeTabStyle : 'hover:text-gray-700'
+                  activeTab === 'myreservations'
+                    ? 'border-b-2 border-[#800000] text-[#800000]'
+                    : 'hover:text-gray-700'
                 }`}
               >
                 My Reservations
@@ -295,7 +264,9 @@
               <button
                 onClick={() => setActiveTab('calendar')}
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'calendar' ? activeTabStyle : 'hover:text-gray-700'
+                  activeTab === 'calendar'
+                    ? 'border-b-2 border-[#800000] text-[#800000]'
+                    : 'hover:text-gray-700'
                 }`}
               >
                 Calendar
@@ -303,7 +274,9 @@
               <button
                 onClick={() => setActiveTab('rules')}
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab === 'rules' ? activeTabStyle : 'hover:text-gray-700'
+                  activeTab === 'rules'
+                    ? 'border-b-2 border-[#800000] text-[#800000]'
+                    : 'hover:text-gray-700'
                 }`}
               >
                 Rules & Guidelines
@@ -330,22 +303,14 @@
                 {rooms.map(room => {
                   const todaysRes = getRoomReservationsToday(room);
                   return (
-                    <div
-                      key={room}
-                      className={`rounded-md shadow p-4 ${getPanelStyle()}`}
-                    >
+                    <div key={room} className="rounded-md shadow p-4 bg-white">
                       <h2 className="text-lg font-bold mb-2">Room {room}</h2>
                       <div className="space-y-2">
                         {todaysRes.length === 0 ? (
-                          <p className="text-sm opacity-75">No reservations today</p>
+                          <p className="text-sm text-gray-600">No reservations today</p>
                         ) : (
                           todaysRes.map(res => (
-                            <div
-                              key={res.id}
-                              className={`p-2 rounded-md text-sm mb-2 ${
-                                theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
-                              }`}
-                            >
+                            <div key={res.id} className="p-2 bg-gray-50 rounded-md text-sm mb-2">
                               Period {res.period} is reserved
                             </div>
                           ))
@@ -357,7 +322,7 @@
               </div>
 
               {/* Booking Form */}
-              <div className={`rounded-md shadow p-4 ${getPanelStyle()}`}>
+              <div className="rounded-md shadow p-4 bg-white">
                 <h2 className="text-lg font-bold mb-4">Book a Room</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -460,7 +425,7 @@
           {/* 2) MY RESERVATIONS TAB */}
           {activeTab === 'myreservations' && (
             <div className="mt-4">
-              <div className={`rounded-md shadow p-4 ${getPanelStyle()}`}>
+              <div className="rounded-md shadow p-4 bg-white">
                 <h2 className="text-lg font-bold mb-4">My Current Reservations</h2>
 
                 {/* Email prompt */}
@@ -487,11 +452,7 @@
                       myReservations().map(res => (
                         <div
                           key={res.id}
-                          className={`p-4 border rounded-lg flex justify-between items-center ${
-                            theme === 'dark'
-                              ? `bg-gray-700 ${getBorderStyle()}`
-                              : `bg-gray-50 border-gray-200`
-                          }`}
+                          className="p-4 border border-gray-200 rounded-lg flex justify-between items-center bg-gray-50"
                         >
                           <div>
                             <p className="font-medium">Room {res.room}</p>
@@ -523,7 +484,7 @@
           {activeTab === 'calendar' && (
             <div className="mt-4 space-y-4">
               {/* Header with Prev/Next Week */}
-              <div className={`rounded-md shadow p-4 flex justify-between items-center ${getPanelStyle()}`}>
+              <div className="rounded-md shadow p-4 bg-white flex justify-between items-center">
                 <button
                   onClick={prevWeek}
                   className={`px-3 py-1 rounded-md ${getPrimaryButtonStyle()}`}
@@ -542,10 +503,10 @@
               </div>
 
               {/* Weekly table: rows = Periods 1..8, columns = the 7 days */}
-              <div className={`rounded-md shadow overflow-x-auto ${getPanelStyle()}`}>
+              <div className="rounded-md shadow overflow-x-auto bg-white">
                 <table className="min-w-full border-collapse">
                   <thead>
-                    <tr className={`border-b ${getBorderStyle()}`}>
+                    <tr className="border-b border-gray-200">
                       <th className="p-2 text-left">Period \ Date</th>
                       {weekDates.map((d, idx) => (
                         <th key={idx} className="p-2 text-center">
@@ -556,21 +517,19 @@
                   </thead>
                   <tbody>
                     {periods.map((p) => (
-                      <tr key={p} className={`border-b ${getBorderStyle()}`}>
+                      <tr key={p} className="border-b border-gray-200">
                         <td className="p-2 font-medium text-center">Period {p}</td>
                         {weekDates.map((dayDate, colIdx) => {
                           const dayRes = getReservationsForDayAndPeriod(dayDate, p);
-                          // Each dayRes item = {room, date, period, ...}
                           if (dayRes.length === 0) {
                             return (
-                              <td key={colIdx} className="p-2 text-center opacity-75">
+                              <td key={colIdx} className="p-2 text-center text-gray-500">
                                 –
                               </td>
                             );
                           }
                           return (
                             <td key={colIdx} className="p-2 text-center">
-                              {/* List rooms that are booked */}
                               {dayRes.map(rObj => (
                                 <div key={rObj.id} className="text-sm">
                                   Room {rObj.room}
@@ -590,7 +549,7 @@
           {/* 4) RULES TAB */}
           {activeTab === 'rules' && (
             <div className="mt-4 space-y-4">
-              <div className={`rounded-md shadow p-4 ${getPanelStyle()}`}>
+              <div className="rounded-md shadow p-4 bg-white">
                 <h2 className="text-lg font-bold">Conference Room Rules & Guidelines</h2>
 
                 <div className="mt-4">
