@@ -2,26 +2,70 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Room Reservation System</title>
-  <!-- Tailwind CSS via CDN (optional) -->
+  <title>Room Reservation System - Weekly View</title>
+  <!-- Tailwind CSS (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- React and ReactDOM via CDN -->
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-  <!-- Babel for JSX transform in the browser -->
+  <!-- Babel for on-the-fly JSX transform in the browser -->
   <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 </head>
-<body class="bg-gray-100">
+<body>
 <div id="root"></div>
 
 <script type="text/babel">
   const { useState, useEffect } = React;
 
+  // Helper: Parse "YYYY-MM-DD" as a *local* date (avoids off-by-one bug in some time zones).
+  function parseLocalDate(dateStr) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    // JS months are zero-based.
+    return new Date(year, month - 1, day);
+  }
+
+  // Format date for display (short).
+  function formatDate(dateStr) {
+    const date = parseLocalDate(dateStr);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  }
+
+  // Return Sunday of the current week by default (or Monday if you prefer).
+  // We'll do Sunday-based weeks in this example.
+  function getStartOfWeek(date = new Date()) {
+    const d = new Date(date);
+    const dayOfWeek = d.getDay(); // 0=Sunday,1=Mon,...
+    // Move 'd' back to Sunday
+    d.setDate(d.getDate() - dayOfWeek);
+    // Zero out hours, minutes, etc.
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  // Given a "weekStart" (the Sunday), return an array of 7 Date objects for that week (Sun->Sat).
+  function getWeekDates(weekStart) {
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      dates.push(d);
+    }
+    return dates;
+  }
+
   function ConferenceRoomSystem() {
-    // State
+    // Tabs
     const [activeTab, setActiveTab] = useState('rooms');
+
+    // Reservations (persisted in localStorage)
     const [reservations, setReservations] = useState([]);
+
+    // Form data for booking
     const [formData, setFormData] = useState({
       room: '',
       date: '',
@@ -30,13 +74,21 @@
       email: '',
       people: '1'
     });
+
+    // Notification
     const [notification, setNotification] = useState(null);
+
+    // Theme system: "light", "dark", "maroon"
+    const [theme, setTheme] = useState('light');
+
+    // For Weekly View
+    const [currentWeekStart, setCurrentWeekStart] = useState(getStartOfWeek());
 
     // Constants
     const rooms = ['A', 'B', 'C', 'D'];
     const periods = Array.from({ length: 8 }, (_, i) => (i + 1).toString());
 
-    // On mount, load from localStorage
+    // Load from localStorage on mount
     useEffect(() => {
       const stored = localStorage.getItem('reservations');
       if (stored) {
@@ -51,40 +103,23 @@
       }
     }, []);
 
-    // Whenever reservations change, save to localStorage
+    // Save to localStorage whenever reservations change
     useEffect(() => {
       localStorage.setItem('reservations', JSON.stringify(reservations));
     }, [reservations]);
 
-    // Fix date shift bug by parsing “YYYY-MM-DD” as a local date
-    function parseLocalDate(dateStr) {
-      // Example input: "2025-01-25"
-      const [year, month, day] = dateStr.split('-').map(Number);
-      // JS Date is zero-based for month, so subtract 1
-      return new Date(year, month - 1, day);
-    }
-
-    // Format date for display
-    function formatDate(dateStr) {
-      const date = parseLocalDate(dateStr);
-      // Customize as needed:
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    }
-
-    // Handlers
-    function handleChange(field, value) {
-      setFormData(prev => ({ ...prev, [field]: value }));
-    }
-
+    // Notification helper
     function showNotification(message, type = 'success') {
       setNotification({ message, type });
       setTimeout(() => setNotification(null), 5000);
     }
 
+    // Handle input changes
+    function handleChange(field, value) {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
+
+    // Submit booking
     function handleSubmit(e) {
       e.preventDefault();
       const cleanedData = {
@@ -106,25 +141,25 @@
         return;
       }
 
-      // Double-booking check
-      const alreadyBooked = reservations.some(
-        r => r.room === cleanedData.room &&
-             r.date === cleanedData.date &&
-             r.period === cleanedData.period
+      // Check for double-booking
+      const isBooked = reservations.some(
+        r =>
+          r.room === cleanedData.room &&
+          r.date === cleanedData.date &&
+          r.period === cleanedData.period
       );
-      if (alreadyBooked) {
+      if (isBooked) {
         showNotification('This room is already booked for that date/period', 'error');
         return;
       }
 
-      // Add
-      const newReservation = {
+      const newRes = {
         ...cleanedData,
         id: Date.now()
       };
-      setReservations(prev => [...prev, newReservation]);
+      setReservations(prev => [...prev, newRes]);
 
-      // Reset form
+      // Reset
       setFormData({
         room: '',
         date: '',
@@ -137,292 +172,488 @@
       showNotification('Reservation successful! Arrive within 10 minutes of period start.');
     }
 
+    // Cancel reservation
     function cancelReservation(id) {
       setReservations(prev => prev.filter(r => r.id !== id));
       showNotification('Reservation cancelled successfully', 'success');
     }
 
-    // For “My Reservations”
+    // "My Reservations" filter
     function myReservations() {
       return reservations
         .filter(r => r.email === formData.email.trim().toLowerCase())
         .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
     }
 
-    // For “Room Availability”
+    // "Rooms" listing
     function getRoomReservations(room) {
       return reservations
         .filter(r => r.room === room)
         .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
     }
 
+    // Weekly View: 7 days (Sun->Sat) from currentWeekStart
+    const weekDates = getWeekDates(currentWeekStart);
+
+    // Next / Prev week
+    function prevWeek() {
+      const newStart = new Date(currentWeekStart);
+      newStart.setDate(newStart.getDate() - 7);
+      setCurrentWeekStart(newStart);
+    }
+    function nextWeek() {
+      const newStart = new Date(currentWeekStart);
+      newStart.setDate(newStart.getDate() + 7);
+      setCurrentWeekStart(newStart);
+    }
+
+    // We'll build a table with rows = periods (1..8) and columns = days in the selected week
+    // For each cell, we list all reservations (by room) that match that day+period.
+    function getReservationsForDayAndPeriod(dayDate, period) {
+      const dateStr = dayDate.toISOString().split('T')[0];
+      return reservations.filter(r => r.date === dateStr && r.period === period);
+    }
+
+    // The theme classes for the outer container
+    const themeClasses = {
+      light: 'bg-gray-100 text-gray-900',
+      dark: 'bg-slate-900 text-white',
+      maroon: 'bg-[#9A2B2B] text-white'
+    };
+
+    // A helper to style backgrounds in different theme contexts
+    function getPanelStyle() {
+      if (theme === 'dark') return 'bg-slate-800';
+      if (theme === 'maroon') return 'bg-[#9A2B2B]/75';
+      return 'bg-white';
+    }
+
+    // A helper to style border in different theme contexts
+    function getBorderStyle() {
+      if (theme === 'dark') return 'border-slate-600';
+      if (theme === 'maroon') return 'border-[#7E1111]';
+      return 'border-gray-200';
+    }
+
+    // Format the top-of-week label for the weekly view. E.g. "Jan 22, 2025"
+    function formatWeekStart(dateObj) {
+      return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    // Format day-of-week header, e.g. "Sun 1/22"
+    function formatDayHeader(dateObj) {
+      const dow = dateObj.toLocaleString('en-US', { weekday: 'short' }); // Sun, Mon, etc.
+      const month = dateObj.getMonth() + 1;
+      const day = dateObj.getDate();
+      return `${dow} ${month}/${day}`;
+    }
+
     return (
-      <div className="p-6 max-w-6xl mx-auto">
-        {/* Tabs */}
-        <div className="mb-8 border-b border-gray-300">
-          <nav className="flex space-x-4" aria-label="Tabs">
-            <button
-              onClick={() => setActiveTab('rooms')}
-              className={`px-3 py-2 text-sm font-medium ${
-                activeTab === 'rooms'
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Room Availability
-            </button>
-            <button
-              onClick={() => setActiveTab('myreservations')}
-              className={`px-3 py-2 text-sm font-medium ${
-                activeTab === 'myreservations'
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              My Reservations
-            </button>
-            <button
-              onClick={() => setActiveTab('rules')}
-              className={`px-3 py-2 text-sm font-medium ${
-                activeTab === 'rules'
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Rules & Guidelines
-            </button>
-          </nav>
-        </div>
-
-        {/* Notification */}
-        {notification && (
-          <div
-            className={`mt-4 p-4 rounded-md ${
-              notification.type === 'error' ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'
-            }`}
-          >
-            {notification.message}
+      <div className={`min-h-screen ${themeClasses[theme]}`}>
+        <div className="p-6 max-w-6xl mx-auto">
+          {/* Top bar with theme selector */}
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold">Room Reservation System</h1>
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium">Theme:</label>
+              <select
+                className="border border-gray-300 rounded-md p-1"
+                value={theme}
+                onChange={(e) => setTheme(e.target.value)}
+              >
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="maroon">Maroon</option>
+              </select>
+            </div>
           </div>
-        )}
 
-        {/* ROOMS TAB */}
-        {activeTab === 'rooms' && (
-          <div className="mt-4">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              {rooms.map(room => (
-                <div key={room} className="bg-white rounded-md shadow p-4">
-                  <h2 className="text-lg font-bold mb-2">Room {room}</h2>
-                  <div className="space-y-2">
-                    {getRoomReservations(room).length === 0 ? (
-                      <p className="text-gray-500 text-sm">No current reservations</p>
+          {/* Tabs */}
+          <div className={`mb-8 border-b ${getBorderStyle()}`}>
+            <nav className="flex space-x-4" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('rooms')}
+                className={`px-3 py-2 text-sm font-medium ${
+                  activeTab === 'rooms'
+                    ? 'border-b-2 border-red-800 text-red-800'
+                    : 'hover:text-gray-700'
+                }`}
+              >
+                Room Availability
+              </button>
+              <button
+                onClick={() => setActiveTab('myreservations')}
+                className={`px-3 py-2 text-sm font-medium ${
+                  activeTab === 'myreservations'
+                    ? 'border-b-2 border-red-800 text-red-800'
+                    : 'hover:text-gray-700'
+                }`}
+              >
+                My Reservations
+              </button>
+              <button
+                onClick={() => setActiveTab('weekly')}
+                className={`px-3 py-2 text-sm font-medium ${
+                  activeTab === 'weekly'
+                    ? 'border-b-2 border-red-800 text-red-800'
+                    : 'hover:text-gray-700'
+                }`}
+              >
+                Weekly View
+              </button>
+              <button
+                onClick={() => setActiveTab('rules')}
+                className={`px-3 py-2 text-sm font-medium ${
+                  activeTab === 'rules'
+                    ? 'border-b-2 border-red-800 text-red-800'
+                    : 'hover:text-gray-700'
+                }`}
+              >
+                Rules & Guidelines
+              </button>
+            </nav>
+          </div>
+
+          {/* Notification */}
+          {notification && (
+            <div
+              className={`mt-4 p-4 rounded-md ${
+                notification.type === 'error' ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'
+              }`}
+            >
+              {notification.message}
+            </div>
+          )}
+
+          {/* 1) ROOMS TAB */}
+          {activeTab === 'rooms' && (
+            <div className="mt-4 space-y-8">
+              {/* Room Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {rooms.map(room => {
+                  const roomRes = getRoomReservations(room);
+                  return (
+                    <div
+                      key={room}
+                      className={`rounded-md shadow p-4 ${getPanelStyle()}`}
+                    >
+                      <h2 className="text-lg font-bold mb-2">Room {room}</h2>
+                      <div className="space-y-2">
+                        {roomRes.length === 0 ? (
+                          <p className="text-sm opacity-75">No current reservations</p>
+                        ) : (
+                          roomRes.map(res => (
+                            <div
+                              key={res.id}
+                              className={`p-2 rounded-md text-sm mb-2 ${
+                                theme === 'dark'
+                                  ? 'bg-slate-700'
+                                  : theme === 'maroon'
+                                  ? 'bg-[#9A2B2B]/50'
+                                  : 'bg-gray-50'
+                              }`}
+                            >
+                              <div>Date: {formatDate(res.date)}</div>
+                              <div>Period: {res.period}</div>
+                              <div>People: {res.people}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Booking Form */}
+              <div className={`rounded-md shadow p-4 ${getPanelStyle()}`}>
+                <h2 className="text-lg font-bold mb-4">Book a Room</h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Room */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium">Room</label>
+                      <select
+                        className="w-full border border-gray-300 rounded-md p-2"
+                        value={formData.room}
+                        onChange={(e) => handleChange('room', e.target.value)}
+                      >
+                        <option value="">Select room</option>
+                        {rooms.map(r => (
+                          <option key={r} value={r}>
+                            Room {r}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Date */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium">Date</label>
+                      <input
+                        type="date"
+                        className="w-full border border-gray-300 rounded-md p-2"
+                        value={formData.date}
+                        onChange={(e) => handleChange('date', e.target.value)}
+                      />
+                    </div>
+
+                    {/* Period */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium">Period (1-8)</label>
+                      <select
+                        className="w-full border border-gray-300 rounded-md p-2"
+                        value={formData.period}
+                        onChange={(e) => handleChange('period', e.target.value)}
+                      >
+                        {periods.map(per => (
+                          <option key={per} value={per}>
+                            Period {per}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Name */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium">Name</label>
+                      <input
+                        type="text"
+                        className="w-full border border-gray-300 rounded-md p-2"
+                        placeholder="Your name"
+                        value={formData.name}
+                        onChange={(e) => handleChange('name', e.target.value)}
+                      />
+                    </div>
+
+                    {/* Email */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium">Email (@rpsnj.us)</label>
+                      <input
+                        type="email"
+                        className="w-full border border-gray-300 rounded-md p-2"
+                        placeholder="your.email@rpsnj.us"
+                        value={formData.email}
+                        onChange={(e) => handleChange('email', e.target.value)}
+                      />
+                    </div>
+
+                    {/* People */}
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium">Number of People (1-12)</label>
+                      <select
+                        className="w-full border border-gray-300 rounded-md p-2"
+                        value={formData.people}
+                        onChange={(e) => handleChange('people', e.target.value)}
+                      >
+                        {Array.from({ length: 12 }, (_, i) => (i + 1).toString()).map(num => (
+                          <option key={num} value={num}>
+                            {num} {num === '1' ? 'person' : 'people'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className={`w-full mt-4 p-2 rounded-md text-white ${
+                      theme === 'maroon'
+                        ? 'bg-red-900 hover:bg-red-800'
+                        : 'bg-red-700 hover:bg-red-600'
+                    }`}
+                  >
+                    Book Room
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* 2) MY RESERVATIONS TAB */}
+          {activeTab === 'myreservations' && (
+            <div className="mt-4">
+              <div className={`rounded-md shadow p-4 ${getPanelStyle()}`}>
+                <h2 className="text-lg font-bold mb-4">My Current Reservations</h2>
+
+                {/* Email prompt */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">
+                    Enter your @rpsnj.us email to view/cancel reservations
+                  </label>
+                  <input
+                    type="email"
+                    className="w-full border border-gray-300 rounded-md p-2"
+                    placeholder="your.email@rpsnj.us"
+                    value={formData.email}
+                    onChange={(e) => handleChange('email', e.target.value)}
+                  />
+                </div>
+
+                {formData.email.toLowerCase().endsWith('@rpsnj.us') ? (
+                  <div className="space-y-4">
+                    {myReservations().length === 0 ? (
+                      <p className="text-gray-500 text-center py-4">
+                        No reservations found for this email.
+                      </p>
                     ) : (
-                      getRoomReservations(room).map(res => (
-                        <div key={res.id} className="p-2 bg-gray-50 rounded-md text-sm mb-2">
-                          <div>Date: {formatDate(res.date)}</div>
-                          <div>Period: {res.period}</div>
-                          <div>People: {res.people}</div>
+                      myReservations().map(res => (
+                        <div
+                          key={res.id}
+                          className={`p-4 border rounded-lg flex justify-between items-center ${
+                            theme === 'dark'
+                              ? `bg-slate-700 ${getBorderStyle()}`
+                              : theme === 'maroon'
+                              ? `bg-[#9A2B2B]/50 ${getBorderStyle()}`
+                              : 'bg-gray-50 border-gray-200'
+                          }`}
+                        >
+                          <div>
+                            <p className="font-medium">Room {res.room}</p>
+                            <p className="text-sm">
+                              Date: {formatDate(res.date)} | Period: {res.period}
+                            </p>
+                            <p className="text-sm">People: {res.people}</p>
+                          </div>
+                          <button
+                            onClick={() => cancelReservation(res.id)}
+                            className={`px-4 py-2 rounded-md text-white ${
+                              theme === 'maroon'
+                                ? 'bg-red-600 hover:bg-red-500'
+                                : 'bg-red-500 hover:bg-red-400'
+                            }`}
+                          >
+                            Cancel
+                          </button>
                         </div>
                       ))
                     )}
                   </div>
-                </div>
-              ))}
+                ) : (
+                  <p className="text-gray-500 text-center py-4">
+                    Please enter your @rpsnj.us email to view your reservations.
+                  </p>
+                )}
+              </div>
             </div>
+          )}
 
-            {/* Booking Form */}
-            <div className="bg-white rounded-md shadow p-4">
-              <h2 className="text-lg font-bold mb-4">Book a Room</h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* Room */}
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Room</label>
-                    <select
-                      className="w-full border border-gray-300 rounded-md p-2"
-                      value={formData.room}
-                      onChange={(e) => handleChange('room', e.target.value)}
-                    >
-                      <option value="">Select room</option>
-                      {rooms.map(r => (
-                        <option key={r} value={r}>
-                          Room {r}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Date */}
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Date</label>
-                    <input
-                      type="date"
-                      className="w-full border border-gray-300 rounded-md p-2"
-                      value={formData.date}
-                      onChange={(e) => handleChange('date', e.target.value)}
-                    />
-                  </div>
-
-                  {/* Period */}
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Period (1-8)</label>
-                    <select
-                      className="w-full border border-gray-300 rounded-md p-2"
-                      value={formData.period}
-                      onChange={(e) => handleChange('period', e.target.value)}
-                    >
-                      {periods.map(period => (
-                        <option key={period} value={period}>
-                          Period {period}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Name */}
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Name</label>
-                    <input
-                      type="text"
-                      className="w-full border border-gray-300 rounded-md p-2"
-                      placeholder="Your name"
-                      value={formData.name}
-                      onChange={(e) => handleChange('name', e.target.value)}
-                    />
-                  </div>
-
-                  {/* Email */}
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Email (@rpsnj.us)</label>
-                    <input
-                      type="email"
-                      className="w-full border border-gray-300 rounded-md p-2"
-                      placeholder="your.email@rpsnj.us"
-                      value={formData.email}
-                      onChange={(e) => handleChange('email', e.target.value)}
-                    />
-                  </div>
-
-                  {/* People */}
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium">Number of People (1-12)</label>
-                    <select
-                      className="w-full border border-gray-300 rounded-md p-2"
-                      value={formData.people}
-                      onChange={(e) => handleChange('people', e.target.value)}
-                    >
-                      {Array.from({ length: 12 }, (_, i) => (i + 1).toString()).map(num => (
-                        <option key={num} value={num}>
-                          {num} {num === '1' ? 'person' : 'people'}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
+          {/* 3) WEEKLY VIEW TAB */}
+          {activeTab === 'weekly' && (
+            <div className="mt-4 space-y-4">
+              {/* Header with Prev/Next Week */}
+              <div className={`rounded-md shadow p-4 flex justify-between items-center ${getPanelStyle()}`}>
                 <button
-                  type="submit"
-                  className="w-full mt-4 bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700"
+                  onClick={prevWeek}
+                  className={`px-3 py-1 rounded-md text-white ${
+                    theme === 'maroon'
+                      ? 'bg-red-900 hover:bg-red-800'
+                      : 'bg-red-700 hover:bg-red-600'
+                  }`}
                 >
-                  Book Room
+                  ‹ Prev
                 </button>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* MY RESERVATIONS TAB */}
-        {activeTab === 'myreservations' && (
-          <div className="mt-4">
-            <div className="bg-white rounded-md shadow p-4">
-              <h2 className="text-lg font-bold mb-4">My Current Reservations</h2>
-
-              {/* Email prompt */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">
-                  Enter your @rpsnj.us email to view reservations
-                </label>
-                <input
-                  type="email"
-                  className="w-full border border-gray-300 rounded-md p-2"
-                  placeholder="your.email@rpsnj.us"
-                  value={formData.email}
-                  onChange={(e) => handleChange('email', e.target.value)}
-                />
+                <h2 className="text-lg font-bold">
+                  Week of {formatWeekStart(currentWeekStart)}
+                </h2>
+                <button
+                  onClick={nextWeek}
+                  className={`px-3 py-1 rounded-md text-white ${
+                    theme === 'maroon'
+                      ? 'bg-red-900 hover:bg-red-800'
+                      : 'bg-red-700 hover:bg-red-600'
+                  }`}
+                >
+                  Next ›
+                </button>
               </div>
 
-              {formData.email.toLowerCase().endsWith('@rpsnj.us') ? (
-                <div className="space-y-4">
-                  {myReservations().length === 0 ? (
-                    <p className="text-gray-500 text-center py-4">
-                      No current reservations found for this email.
-                    </p>
-                  ) : (
-                    myReservations().map(reservation => (
-                      <div
-                        key={reservation.id}
-                        className="p-4 border rounded-lg bg-gray-50 flex justify-between items-center"
-                      >
-                        <div>
-                          <p className="font-medium">Room {reservation.room}</p>
-                          <p className="text-sm text-gray-600">Date: {formatDate(reservation.date)}</p>
-                          <p className="text-sm text-gray-600">Period: {reservation.period}</p>
-                          <p className="text-sm text-gray-600">People: {reservation.people}</p>
-                        </div>
-                        <button
-                          onClick={() => cancelReservation(reservation.id)}
-                          className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ))
-                  )}
+              {/* Weekly table: rows = Periods 1..8, columns = the 7 days */}
+              <div className={`rounded-md shadow overflow-x-auto ${getPanelStyle()}`}>
+                <table className="min-w-full border-collapse">
+                  <thead>
+                    <tr className={`border-b ${getBorderStyle()}`}>
+                      <th className="p-2 text-left">Period \ Date</th>
+                      {weekDates.map((d, idx) => (
+                        <th key={idx} className="p-2 text-center">
+                          {formatDayHeader(d)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {periods.map((p) => (
+                      <tr key={p} className={`border-b ${getBorderStyle()}`}>
+                        <td className="p-2 font-medium text-center">Period {p}</td>
+                        {weekDates.map((dayDate, colIdx) => {
+                          const dayRes = getReservationsForDayAndPeriod(dayDate, p); 
+                          // dayRes might contain multiple reservations with different rooms
+                          if (dayRes.length === 0) {
+                            return (
+                              <td key={colIdx} className="p-2 text-center opacity-75">
+                                –
+                              </td>
+                            );
+                          } else {
+                            return (
+                              <td key={colIdx} className="p-2 text-center">
+                                {/* List rooms that are booked */}
+                                {dayRes.map((rObj) => (
+                                  <div key={rObj.id} className="text-sm">
+                                    Room {rObj.room}
+                                  </div>
+                                ))}
+                              </td>
+                            );
+                          }
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 4) RULES TAB */}
+          {activeTab === 'rules' && (
+            <div className="mt-4 space-y-4">
+              <div className={`rounded-md shadow p-4 ${getPanelStyle()}`}>
+                <h2 className="text-lg font-bold">Conference Room Rules & Guidelines</h2>
+
+                <div className="mt-4">
+                  <h3 className="font-semibold mb-2">Attendance Policy</h3>
+                  <p>
+                    Reservations will be automatically cancelled if users do not arrive within 10 minutes
+                    of their period start time. After cancellation, the room becomes available for
+                    immediate booking by other users.
+                  </p>
                 </div>
-              ) : (
-                <p className="text-gray-500 text-center py-4">
-                  Please enter your @rpsnj.us email to view/cancel your reservations.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
 
-        {/* RULES & GUIDELINES TAB */}
-        {activeTab === 'rules' && (
-          <div className="mt-4 bg-white rounded-md shadow p-4 space-y-4">
-            <h2 className="text-lg font-bold">Conference Room Rules & Guidelines</h2>
+                <div className="mt-4">
+                  <h3 className="font-semibold mb-2">Booking Guidelines</h3>
+                  <ul className="list-disc pl-5 space-y-2">
+                    <li>Reservations must be made using an @rpsnj.us email address</li>
+                    <li>Rooms can accommodate 1–12 people</li>
+                    <li>Users can book one period at a time</li>
+                    <li>Please cancel reservations if you no longer need the room</li>
+                    <li>Keep the room clean and organized for the next group</li>
+                  </ul>
+                </div>
 
-            <div>
-              <h3 className="font-semibold mb-2">Attendance Policy</h3>
-              <p className="text-gray-600">
-                Reservations will be automatically cancelled if users do not arrive within 10 minutes
-                of their period start time. After cancellation, the room becomes available for immediate
-                booking by other users.
-              </p>
+                <div className="mt-4">
+                  <h3 className="font-semibold mb-2">Room Usage</h3>
+                  <ul className="list-disc pl-5 space-y-2">
+                    <li>Maintain appropriate noise levels</li>
+                    <li>Do not leave personal belongings unattended</li>
+                    <li>Report any technical issues or damages immediately</li>
+                    <li>No food or drinks allowed (water bottles excepted)</li>
+                  </ul>
+                </div>
+              </div>
             </div>
-
-            <div>
-              <h3 className="font-semibold mb-2">Booking Guidelines</h3>
-              <ul className="list-disc pl-5 space-y-2 text-gray-600">
-                <li>Reservations must be made using an @rpsnj.us email address.</li>
-                <li>Rooms can accommodate 1–12 people.</li>
-                <li>Users can book one period at a time.</li>
-                <li>Please cancel reservations if you no longer need the room.</li>
-                <li>Keep the room clean and organized for the next group.</li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-2">Room Usage</h3>
-              <ul className="list-disc pl-5 space-y-2 text-gray-600">
-                <li>Maintain appropriate noise levels.</li>
-                <li>Do not leave personal belongings unattended.</li>
-                <li>Report any technical issues or damages immediately.</li>
-                <li>No food or drinks allowed (water bottles excepted).</li>
-              </ul>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   }
