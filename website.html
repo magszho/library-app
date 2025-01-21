@@ -31,10 +31,6 @@
     input[type="date"]::-webkit-datetime-edit-year-field {
       color: black !important;
     }
-
-    /* We do NOT override the "disabled" or "out of range" color, 
-       so invalid dates still appear grayed. */
-    /* The user won't be able to select them anyway due to `min` and `max`. */
   </style>
 </head>
 <body>
@@ -44,30 +40,25 @@
   const { useState, useEffect } = React;
 
   // --- Date Helpers ---
-
-  // Parse "YYYY-MM-DD" as local date (avoids UTC shift bug).
   function parseLocalDate(dateStr) {
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year, month - 1, day);
   }
 
-  // Return today's date in "YYYY-MM-DD" (local midnight).
   function getTodayStr() {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     return now.toISOString().split('T')[0];
   }
 
-  // Return Sunday of the current week (used for weekly calendar).
   function getStartOfWeek(date = new Date()) {
     const d = new Date(date);
-    const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ...
+    const dayOfWeek = d.getDay(); // 0=Sun, ...
     d.setDate(d.getDate() - dayOfWeek);
     d.setHours(0, 0, 0, 0);
     return d;
   }
 
-  // Generate 7 days from a "week start" (Sun->Sat).
   function getWeekDates(weekStart) {
     const dates = [];
     for (let i = 0; i < 7; i++) {
@@ -78,7 +69,6 @@
     return dates;
   }
 
-  // Format day-of-week header (e.g., "Sun 1/22").
   function formatDayHeader(dateObj) {
     const dow = dateObj.toLocaleString('en-US', { weekday: 'short' });
     const month = dateObj.getMonth() + 1;
@@ -86,7 +76,6 @@
     return `${dow} ${month}/${day}`;
   }
 
-  // Format the "week start" for display (e.g., "Jan 22, 2025").
   function formatWeekStart(dateObj) {
     return dateObj.toLocaleDateString('en-US', {
       month: 'short',
@@ -99,7 +88,7 @@
     // Tabs
     const [activeTab, setActiveTab] = useState('rooms');
 
-    // Reservations (localStorage)
+    // Reservations
     const [reservations, setReservations] = useState([]);
 
     // Booking form data
@@ -126,10 +115,10 @@
     const todayStr = getTodayStr();
     const todayObj = parseLocalDate(todayStr);
     const maxDateObj = new Date(todayObj);
-    maxDateObj.setDate(maxDateObj.getDate() + 10); // 10 days in future
+    maxDateObj.setDate(maxDateObj.getDate() + 10);
     const maxDateStr = maxDateObj.toISOString().split('T')[0];
 
-    // Load from localStorage
+    // Load from localStorage on mount
     useEffect(() => {
       const stored = localStorage.getItem('reservations');
       if (stored) {
@@ -149,15 +138,18 @@
       localStorage.setItem('reservations', JSON.stringify(reservations));
     }, [reservations]);
 
+    // Show notifications
     function showNotification(message, type = 'success') {
       setNotification({ message, type });
       setTimeout(() => setNotification(null), 5000);
     }
 
+    // Handle input changes
     function handleChange(field, value) {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
 
+    // Submit booking
     function handleSubmit(e) {
       e.preventDefault();
       const cleanedData = {
@@ -169,7 +161,7 @@
         people: formData.people.trim()
       };
 
-      // Validate
+      // Validate fields
       if (Object.values(cleanedData).some(v => !v)) {
         showNotification('Please fill in all fields', 'error');
         return;
@@ -179,7 +171,7 @@
         return;
       }
 
-      // Date constraints
+      // Check date range
       const chosenDate = parseLocalDate(cleanedData.date);
       if (chosenDate < todayObj) {
         showNotification('You cannot book a past date', 'error');
@@ -190,9 +182,9 @@
         return;
       }
 
-      // Double booking check
+      // Double-booking check
       const isBooked = reservations.some(
-        r => 
+        r =>
           r.room === cleanedData.room &&
           r.date === cleanedData.date &&
           r.period === cleanedData.period
@@ -202,10 +194,10 @@
         return;
       }
 
-      // Add reservation with checkIn default to "Pending"
-      const newRes = { 
-        ...cleanedData, 
-        id: Date.now(), 
+      // Add new reservation
+      const newRes = {
+        ...cleanedData,
+        id: Date.now(),
         checkedIn: 'Pending'
       };
       setReservations(prev => [...prev, newRes]);
@@ -223,33 +215,58 @@
       showNotification('Reservation successful! Arrive within 10 minutes of period start.');
     }
 
+    // Cancel reservation by id
     function cancelReservation(id) {
       setReservations(prev => prev.filter(r => r.id !== id));
       showNotification('Reservation cancelled successfully', 'success');
     }
 
-    // For admin: mark as checked in
-    function checkInReservation(id) {
-      setReservations(prev =>
-        prev.map(r => (r.id === id ? { ...r, checkedIn: 'Checked In' } : r))
-      );
-      showNotification('Check-In successful!', 'success');
+    // If already checked in => uncheck in (set "Pending")
+    // If not checked in => check in (set "Checked In")
+    function toggleCheckIn(id) {
+      setReservations(prev => {
+        return prev.map(r => {
+          if (r.id === id) {
+            if (r.checkedIn === 'Checked In') {
+              return { ...r, checkedIn: 'Pending' };
+            } else {
+              return { ...r, checkedIn: 'Checked In' };
+            }
+          }
+          return r;
+        });
+      });
+      showNotification('Toggled check-in status!', 'success');
     }
 
+    // Check Out => "Checked Out"
+    function checkOutReservation(id) {
+      setReservations(prev => {
+        return prev.map(r => {
+          if (r.id === id) {
+            return { ...r, checkedIn: 'Checked Out' };
+          }
+          return r;
+        });
+      });
+      showNotification('Check-Out successful!', 'success');
+    }
+
+    // Filter a normal user's reservations
     function myReservations() {
       return reservations
         .filter(r => r.email === formData.email.trim().toLowerCase())
         .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
     }
 
-    // Show today's reservations only in "rooms" tab
+    // For the Rooms tab, show only today's reservations
     function getRoomReservationsToday(room) {
       return reservations
         .filter(r => r.room === room && r.date === todayStr)
         .sort((a, b) => parseInt(a.period, 10) - parseInt(b.period, 10));
     }
 
-    // Weekly calendar logic
+    // Weekly calendar
     function prevWeek() {
       const newStart = new Date(currentWeekStart);
       newStart.setDate(newStart.getDate() - 7);
@@ -267,13 +284,13 @@
       return reservations.filter(r => r.date === dayStr && r.period === period);
     }
 
-    // Style for maroon buttons
+    // Check if user is admin (07mzhou@rpsnj.us)
+    const isAdmin = formData.email.trim().toLowerCase() === '07mzhou@rpsnj.us';
+
+    // Maroon button style
     function getPrimaryButtonStyle() {
       return 'bg-[#800000] hover:bg-[#700000] text-white';
     }
-
-    // Check if user is admin
-    const isAdmin = formData.email.trim().toLowerCase() === '07mzhou@rpsnj.us';
 
     return (
       <div className="min-h-screen bg-gray-100 text-gray-900">
@@ -330,29 +347,28 @@
           {notification && (
             <div
               className={`mt-4 p-4 rounded-md ${
-                notification.type === 'error'
-                  ? 'bg-red-50 text-red-800'
-                  : 'bg-green-50 text-green-800'
+                notification.type === 'error' ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'
               }`}
             >
               {notification.message}
             </div>
           )}
 
-          {/* ROOMS TAB (Today) */}
+          {/* ROOMS TAB */}
           {activeTab === 'rooms' && (
             <div className="mt-4 space-y-8">
+              {/* Today's reservations */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {rooms.map(room => {
-                  const todaysRes = getRoomReservationsToday(room);
+                  const todays = getRoomReservationsToday(room);
                   return (
                     <div key={room} className="rounded-md shadow p-4 bg-white">
                       <h2 className="text-lg font-bold mb-2">Room {room}</h2>
                       <div className="space-y-2">
-                        {todaysRes.length === 0 ? (
+                        {todays.length === 0 ? (
                           <p className="text-sm text-gray-600">No reservations today</p>
                         ) : (
-                          todaysRes.map(res => (
+                          todays.map(res => (
                             <div key={res.id} className="p-2 bg-gray-50 rounded-md text-sm mb-2">
                               Period {res.period} is reserved
                             </div>
@@ -364,6 +380,7 @@
                 })}
               </div>
 
+              {/* Booking Form */}
               <div className="rounded-md shadow p-4 bg-white">
                 <h2 className="text-lg font-bold mb-4">Book a Room</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -374,7 +391,7 @@
                       <select
                         className="w-full border border-gray-300 rounded-md p-2"
                         value={formData.room}
-                        onChange={(e) => handleChange('room', e.target.value)}
+                        onChange={e => handleChange('room', e.target.value)}
                       >
                         <option value="">Select room</option>
                         {rooms.map(r => (
@@ -392,7 +409,7 @@
                         type="date"
                         className="w-full border border-gray-300 rounded-md p-2"
                         value={formData.date}
-                        onChange={(e) => handleChange('date', e.target.value)}
+                        onChange={e => handleChange('date', e.target.value)}
                         min={todayStr}
                         max={maxDateStr}
                       />
@@ -404,7 +421,7 @@
                       <select
                         className="w-full border border-gray-300 rounded-md p-2"
                         value={formData.period}
-                        onChange={(e) => handleChange('period', e.target.value)}
+                        onChange={e => handleChange('period', e.target.value)}
                       >
                         {periods.map(per => (
                           <option key={per} value={per}>
@@ -422,7 +439,7 @@
                         className="w-full border border-gray-300 rounded-md p-2"
                         placeholder="Your name"
                         value={formData.name}
-                        onChange={(e) => handleChange('name', e.target.value)}
+                        onChange={e => handleChange('name', e.target.value)}
                       />
                     </div>
 
@@ -434,7 +451,7 @@
                         className="w-full border border-gray-300 rounded-md p-2"
                         placeholder="your.email@rpsnj.us"
                         value={formData.email}
-                        onChange={(e) => handleChange('email', e.target.value)}
+                        onChange={e => handleChange('email', e.target.value)}
                       />
                     </div>
 
@@ -444,7 +461,7 @@
                       <select
                         className="w-full border border-gray-300 rounded-md p-2"
                         value={formData.people}
-                        onChange={(e) => handleChange('people', e.target.value)}
+                        onChange={e => handleChange('people', e.target.value)}
                       >
                         {Array.from({ length: 12 }, (_, i) => (i + 1).toString()).map(num => (
                           <option key={num} value={num}>
@@ -481,13 +498,13 @@
                     className="w-full border border-gray-300 rounded-md p-2"
                     placeholder="your.email@rpsnj.us"
                     value={formData.email}
-                    onChange={(e) => handleChange('email', e.target.value)}
+                    onChange={e => handleChange('email', e.target.value)}
                   />
                 </div>
 
                 {formData.email.toLowerCase().endsWith('@rpsnj.us') ? (
-                  // ADMIN LOGIC: if 07mzhou@rpsnj.us => show ALL reservations with Cancel + Check In
-                  isAdmin ? (
+                  // ADMIN (07mzhou@rpsnj.us): show ALL reservations with Name & Email
+                  formData.email.trim().toLowerCase() === '07mzhou@rpsnj.us' ? (
                     <div className="space-y-4">
                       <h3 className="text-md font-semibold text-red-700">Admin Access: Viewing all reservations</h3>
                       
@@ -502,13 +519,13 @@
                             className="p-4 border border-gray-200 rounded-lg bg-gray-50 flex justify-between items-center"
                           >
                             <div>
-                              <p className="font-medium">Room {res.room}</p>
-                              <p className="text-sm">
-                                Date: {res.date} | Period: {res.period}
-                              </p>
-                              <p className="text-sm">People: {res.people}</p>
+                              {/* Single-line details (no dashes) */}
+                              <p className="font-medium">Name: {res.name}, Email: {res.email}</p>
                               <p className="text-sm mt-1">
-                                Check-In Status:
+                                Room: {res.room}, Date: {res.date}, Period: {res.period}, People: {res.people}
+                              </p>
+                              <p className="text-sm mt-1">
+                                Check-In Status: 
                                 <button
                                   className="ml-2 px-3 py-1 rounded-md bg-gray-300 cursor-default"
                                   disabled
@@ -518,17 +535,37 @@
                               </p>
                             </div>
                             <div className="space-x-2">
+                              {/* Cancel button */}
                               <button
                                 onClick={() => cancelReservation(res.id)}
                                 className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
                               >
                                 Cancel
                               </button>
+
+                              {/* Check In / Uncheck In button */}
+                              {res.checkedIn === 'Checked In' ? (
+                                <button
+                                  onClick={() => toggleCheckIn(res.id)}
+                                  className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
+                                >
+                                  Uncheck In
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => toggleCheckIn(res.id)}
+                                  className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
+                                >
+                                  Check In
+                                </button>
+                              )}
+
+                              {/* Check Out button */}
                               <button
-                                onClick={() => checkInReservation(res.id)}
+                                onClick={() => checkOutReservation(res.id)}
                                 className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
                               >
-                                Check In
+                                Check Out
                               </button>
                             </div>
                           </div>
@@ -536,7 +573,7 @@
                       )}
                     </div>
                   ) : (
-                    // NORMAL USER (email != 07mzhou@rpsnj.us)
+                    // Normal user (non-admin)
                     <div className="space-y-4">
                       {myReservations().length === 0 ? (
                         <p className="text-gray-500 text-center py-4">
@@ -549,13 +586,12 @@
                             className="p-4 border border-gray-200 rounded-lg bg-gray-50 flex justify-between items-center"
                           >
                             <div>
-                              <p className="font-medium">Room {res.room}</p>
-                              <p className="text-sm">
-                                Date: {res.date} | Period: {res.period}
+                              <p className="font-medium">
+                                {/* Single line, no dashes */}
+                                Room: {res.room}, Date: {res.date}, Period: {res.period}, People: {res.people}
                               </p>
-                              <p className="text-sm">People: {res.people}</p>
                               <p className="text-sm mt-1">
-                                Check-In Status: 
+                                Check-In Status:
                                 <button
                                   className="ml-2 px-3 py-1 rounded-md bg-gray-300 cursor-default"
                                   disabled
@@ -564,12 +600,23 @@
                                 </button>
                               </p>
                             </div>
-                            <button
-                              onClick={() => cancelReservation(res.id)}
-                              className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
-                            >
-                              Cancel
-                            </button>
+                            <div className="space-x-2">
+                              {/* Cancel */}
+                              <button
+                                onClick={() => cancelReservation(res.id)}
+                                className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
+                              >
+                                Cancel
+                              </button>
+
+                              {/* Check Out (for user) */}
+                              <button
+                                onClick={() => checkOutReservation(res.id)}
+                                className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
+                              >
+                                Check Out
+                              </button>
+                            </div>
                           </div>
                         ))
                       )}
@@ -629,8 +676,8 @@
                     {periods.map(p => (
                       <tr key={p} className="border-b border-gray-200">
                         <td className="p-2 font-medium text-center">Period {p}</td>
-                        {weekDates.map((dayDate, colIdx) => {
-                          const dayRes = getReservationsForDayAndPeriod(dayDate, p);
+                        {weekDates.map((dayD, colIdx) => {
+                          const dayRes = getReservationsForDayAndPeriod(dayD, p);
                           if (dayRes.length === 0) {
                             return (
                               <td key={colIdx} className="p-2 text-center text-gray-500">
