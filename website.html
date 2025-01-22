@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Room Reservation System with Library Status</title>
+  <title>Room Reservation System - Date Picker Style</title>
 
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -11,15 +11,17 @@
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 
-  <!-- Babel for on-the-fly JSX -->
+  <!-- Babel for on-the-fly JSX transform -->
   <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 
-  <!-- Minimal CSS overrides for date input text color (Chrome) -->
+  <!-- Small CSS override for date input -->
   <style>
+    /* Force black text for the visible (month, day, year) parts in Chrome-like browsers */
     input[type="date"] {
-      color-scheme: light;
-      color: black;
+      color-scheme: light; /* Ensures it doesn't switch to a "dark" scheme internally */
+      color: black;        /* Fallback for general text */
     }
+    /* Force each part of the date to be black */
     input[type="date"]::-webkit-datetime-edit {
       color: black;
     }
@@ -35,67 +37,61 @@
 <div id="root"></div>
 
 <script type="text/babel">
-
   const { useState, useEffect } = React;
 
-  // Helper: parse "YYYY-MM-DD" as local date
+  // --- Date Helpers ---
   function parseLocalDate(dateStr) {
     const [year, month, day] = dateStr.split('-').map(Number);
     return new Date(year, month - 1, day);
   }
 
-  // Helper: today's date in "YYYY-MM-DD"
   function getTodayStr() {
     const now = new Date();
-    now.setHours(0,0,0,0);
+    now.setHours(0, 0, 0, 0);
     return now.toISOString().split('T')[0];
   }
 
-  // For weekly calendars
   function getStartOfWeek(date = new Date()) {
     const d = new Date(date);
-    const dow = d.getDay(); // 0=Sun
-    d.setDate(d.getDate() - dow);
-    d.setHours(0,0,0,0);
+    const dayOfWeek = d.getDay(); // 0=Sun, ...
+    d.setDate(d.getDate() - dayOfWeek);
+    d.setHours(0, 0, 0, 0);
     return d;
   }
 
   function getWeekDates(weekStart) {
-    const arr = [];
-    for (let i=0; i<7; i++){
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
       const d = new Date(weekStart);
-      d.setDate(d.getDate()+i);
-      arr.push(d);
+      d.setDate(d.getDate() + i);
+      dates.push(d);
     }
-    return arr;
+    return dates;
   }
 
-  function formatDayHeader(d) {
-    const dow = d.toLocaleString('en-US',{weekday:'short'});
-    const m = d.getMonth() + 1;
-    const day = d.getDate();
-    return `${dow} ${m}/${day}`;
+  function formatDayHeader(dateObj) {
+    const dow = dateObj.toLocaleString('en-US', { weekday: 'short' });
+    const month = dateObj.getMonth() + 1;
+    const day = dateObj.getDate();
+    return `${dow} ${month}/${day}`;
   }
 
-  function formatWeekTitle(d) {
-    return d.toLocaleString('en-US', {month:'short',day:'numeric',year:'numeric'});
+  function formatWeekStart(dateObj) {
+    return dateObj.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
   }
 
   function ConferenceRoomSystem() {
     // Tabs
-    const [activeTab, setActiveTab] = useState("rooms");
+    const [activeTab, setActiveTab] = useState('rooms');
 
-    // "reservations" state
+    // Reservations
     const [reservations, setReservations] = useState([]);
 
-    // "libraryStatus" state: dict { "YYYY-MM-DD": "Open"|"Closed" }
-    const [libraryStatus, setLibraryStatus] = useState({});
-
-    // Weekly calendars
-    const [currentWeekStart, setCurrentWeekStart] = useState(getStartOfWeek());
-    const [currentLibWeekStart, setCurrentLibWeekStart] = useState(getStartOfWeek());
-
-    // Form data for booking
+    // Booking form data
     const [formData, setFormData] = useState({
       room: '',
       date: '',
@@ -108,79 +104,59 @@
     // Notification
     const [notification, setNotification] = useState(null);
 
+    // Weekly Calendar
+    const [currentWeekStart, setCurrentWeekStart] = useState(getStartOfWeek());
+
     // Constants
-    const rooms = ['A','B','C','D'];
-    const periods = Array.from({length:8},(_,i)=> (i+1).toString());
+    const rooms = ['A', 'B', 'C', 'D'];
+    const periods = Array.from({ length: 8 }, (_, i) => (i + 1).toString());
+
+    // Date constraints
     const todayStr = getTodayStr();
     const todayObj = parseLocalDate(todayStr);
-    const maxDateObj = new Date(todayObj); maxDateObj.setDate(maxDateObj.getDate()+10);
+    const maxDateObj = new Date(todayObj);
+    maxDateObj.setDate(maxDateObj.getDate() + 10);
     const maxDateStr = maxDateObj.toISOString().split('T')[0];
 
-    // Admin check
-    const isAdmin = formData.email.trim().toLowerCase() === '07mzhou@rpsnj.us';
+    // **Add a simple boolean to indicate if library is open or closed**  
+    // Toggle to false if you want to show "closed".
+    const [libraryIsOpen, setLibraryIsOpen] = useState(true);
 
-    // On mount, load "reservations" and "libraryStatus" from localStorage
-    useEffect(()=>{
-      const storedRes = localStorage.getItem('reservations');
-      if(storedRes){
-        try{
-          const arr = JSON.parse(storedRes);
-          if(Array.isArray(arr)){
-            setReservations(arr);
+    // Load from localStorage on mount
+    useEffect(() => {
+      const stored = localStorage.getItem('reservations');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setReservations(parsed);
           }
-        }catch(e){console.error("Can't parse reservations", e);}
+        } catch (err) {
+          console.error('Failed to parse stored reservations:', err);
+        }
       }
-      const storedLib = localStorage.getItem('libraryStatus');
-      if(storedLib){
-        try{
-          const obj = JSON.parse(storedLib);
-          if(obj && typeof obj==='object'){
-            setLibraryStatus(obj);
-          }
-        }catch(e){console.error("Can't parse libraryStatus", e);}
-      }
-    },[]);
+    }, []);
 
-    // Whenever reservations changes, store them
-    useEffect(()=>{
+    // Save whenever reservations change
+    useEffect(() => {
       localStorage.setItem('reservations', JSON.stringify(reservations));
     }, [reservations]);
 
-    // Whenever libraryStatus changes, store it
-    useEffect(()=>{
-      localStorage.setItem('libraryStatus', JSON.stringify(libraryStatus));
-    }, [libraryStatus]);
-
-    function showNotification(msg, type='success'){
-      setNotification({msg, type});
-      setTimeout(()=> setNotification(null), 5000);
+    // Show notifications
+    function showNotification(message, type = 'success') {
+      setNotification({ message, type });
+      setTimeout(() => setNotification(null), 5000);
     }
 
-    // For library status: default "Open" if not found
-    function getLibraryStatus(dateStr){
-      if(!libraryStatus[dateStr]) return "Open";
-      return libraryStatus[dateStr];
+    // Handle input changes
+    function handleChange(field, value) {
+      setFormData(prev => ({ ...prev, [field]: value }));
     }
 
-    // Admin toggles library open/closed for a day
-    function toggleLibraryStatus(dateStr){
-      setLibraryStatus(prev=>{
-        const old = prev[dateStr] || "Open";
-        const newVal = (old==="Open"? "Closed":"Open");
-        return {...prev, [dateStr]: newVal};
-      });
-      showNotification("Toggled library status for "+dateStr, 'success');
-    }
-
-    // Book room form
-    function handleChange(field,val){
-      setFormData(prev=>({...prev, [field]: val}));
-    }
-
-    // Book room submit
-    function handleSubmit(e){
+    // Submit booking
+    function handleSubmit(e) {
       e.preventDefault();
-      const c = {
+      const cleanedData = {
         room: formData.room.trim(),
         date: formData.date.trim(),
         period: formData.period.trim(),
@@ -189,179 +165,198 @@
         people: formData.people.trim()
       };
 
-      // Basic checks
-      if(Object.values(c).some(v=>!v)){
-        showNotification("Please fill in all fields","error");
+      // Validate fields
+      if (Object.values(cleanedData).some(v => !v)) {
+        showNotification('Please fill in all fields', 'error');
         return;
       }
-      if(!c.email.endsWith('@rpsnj.us')){
-        showNotification("Please use an @rpsnj.us email address","error");
-        return;
-      }
-
-      // Date constraints
-      const chosenDate = parseLocalDate(c.date);
-      if(chosenDate < todayObj){
-        showNotification("You cannot book a past date","error");
-        return;
-      }
-      if(chosenDate>maxDateObj){
-        showNotification("You can only book up to 10 days in advance","error");
+      if (!cleanedData.email.endsWith('@rpsnj.us')) {
+        showNotification('Please use an @rpsnj.us email address', 'error');
         return;
       }
 
-      // If library is closed that day, do we allow booking or block? 
-      // For now, let's just block:
-      const stat = getLibraryStatus(c.date);
-      if(stat==="Closed"){
-        showNotification("Cannot book because library is CLOSED that day","error");
+      // Check date range
+      const chosenDate = parseLocalDate(cleanedData.date);
+      if (chosenDate < todayObj) {
+        showNotification('You cannot book a past date', 'error');
+        return;
+      }
+      if (chosenDate > maxDateObj) {
+        showNotification('You can only book up to 10 days in advance', 'error');
         return;
       }
 
-      // Double-book check
-      const isBooked = reservations.some(r=> r.room===c.room && r.date===c.date && r.period===c.period);
-      if(isBooked){
-        showNotification("Room already booked for that date/period","error");
+      // Double-booking check
+      const isBooked = reservations.some(
+        r =>
+          r.room === cleanedData.room &&
+          r.date === cleanedData.date &&
+          r.period === cleanedData.period
+      );
+      if (isBooked) {
+        showNotification('That room is already booked for the chosen date/period', 'error');
         return;
       }
 
-      // All good
-      const newRes = { ...c, id: Date.now(), checkedIn:'Pending' };
-      setReservations(prev=>[...prev, newRes]);
-      showNotification("Reservation successful! Arrive within 10 minutes.","success");
+      // Add new reservation
+      const newRes = {
+        ...cleanedData,
+        id: Date.now(),
+        checkedIn: 'Pending'
+      };
+      setReservations(prev => [...prev, newRes]);
 
-      // reset form
+      // Reset
       setFormData({
-        room:'',
-        date:'',
-        period:'1',
-        name:'',
-        email:'',
-        people:'1'
+        room: '',
+        date: '',
+        period: '1',
+        name: '',
+        email: '',
+        people: '1'
       });
+
+      showNotification('Reservation successful! Arrive within 10 minutes of period start.');
     }
 
-    // Cancel reservation
-    function cancelReservation(id){
-      setReservations(prev=> prev.filter(r=> r.id!==id));
-      showNotification("Reservation cancelled successfully","success");
+    // Cancel reservation by id
+    function cancelReservation(id) {
+      setReservations(prev => prev.filter(r => r.id !== id));
+      showNotification('Reservation cancelled successfully', 'success');
     }
 
-    // Check Out => "Checked Out"
-    function checkOutReservation(id){
-      setReservations(prev=>{
-        return prev.map(r=>{
-          if(r.id===id) return {...r,checkedIn:"Checked Out"};
-          return r;
-        });
-      });
-      showNotification("Check-Out successful!","success");
-    }
-
-    // Toggle Check In or Uncheck In
-    function toggleCheckIn(id){
-      setReservations(prev=>{
-        return prev.map(r=>{
-          if(r.id===id){
-            if(r.checkedIn==="Checked In") return {...r,checkedIn:"Pending"};
-            else return {...r,checkedIn:"Checked In"};
+    // If already checked in => uncheck in (set "Pending")
+    // If not checked in => check in (set "Checked In")
+    function toggleCheckIn(id) {
+      setReservations(prev => {
+        return prev.map(r => {
+          if (r.id === id) {
+            if (r.checkedIn === 'Checked In') {
+              return { ...r, checkedIn: 'Pending' };
+            } else {
+              return { ...r, checkedIn: 'Checked In' };
+            }
           }
           return r;
         });
       });
-      showNotification("Toggled check-in status!","success");
+      showNotification('Toggled check-in status!', 'success');
     }
 
-    // My reservations filter
-    function myReservations(){
+    // Check Out => "Checked Out"
+    function checkOutReservation(id) {
+      setReservations(prev => {
+        return prev.map(r => {
+          if (r.id === id) {
+            return { ...r, checkedIn: 'Checked Out' };
+          }
+          return r;
+        });
+      });
+      showNotification('Check-Out successful!', 'success');
+    }
+
+    // Filter a normal user's reservations
+    function myReservations() {
       return reservations
-        .filter(r=> r.email===formData.email.trim().toLowerCase())
-        .sort((a,b)=> parseLocalDate(a.date)-parseLocalDate(b.date));
+        .filter(r => r.email === formData.email.trim().toLowerCase())
+        .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
     }
 
-    // For "rooms" tab: today's reservations. 
-    // Also show today's library status 
-    function getRoomReservationsToday(room){
+    // For the Rooms tab, show only today's reservations
+    function getRoomReservationsToday(room) {
       return reservations
-        .filter(r=> r.room===room && r.date===todayStr)
-        .sort((a,b)=> parseInt(a.period,10)-parseInt(b.period,10));
+        .filter(r => r.room === room && r.date === todayStr)
+        .sort((a, b) => parseInt(a.period, 10) - parseInt(b.period, 10));
     }
 
-    // Weekly calendar for reservations (original "Calendar")
-    function prevWeekRes(){
-      const n = new Date(currentWeekStart);
-      n.setDate(n.getDate()-7);
-      setCurrentWeekStart(n);
+    // Weekly calendar
+    function prevWeek() {
+      const newStart = new Date(currentWeekStart);
+      newStart.setDate(newStart.getDate() - 7);
+      setCurrentWeekStart(newStart);
     }
-    function nextWeekRes(){
-      const n = new Date(currentWeekStart);
-      n.setDate(n.getDate()+7);
-      setCurrentWeekStart(n);
+    function nextWeek() {
+      const newStart = new Date(currentWeekStart);
+      newStart.setDate(newStart.getDate() + 7);
+      setCurrentWeekStart(newStart);
     }
-    const weekDatesRes = getWeekDates(currentWeekStart);
+    const weekDates = getWeekDates(currentWeekStart);
 
-    function getReservationsForDayAndPeriod(dayD, period){
-      const ds = dayD.toISOString().split('T')[0];
-      return reservations.filter(r=> r.date===ds && r.period===period);
+    function getReservationsForDayAndPeriod(dayDate, period) {
+      const dayStr = dayDate.toISOString().split('T')[0];
+      return reservations.filter(r => r.date === dayStr && r.period === period);
     }
 
-    // Weekly "Library Status" view
-    function prevWeekLib(){
-      const n = new Date(currentLibWeekStart);
-      n.setDate(n.getDate()-7);
-      setCurrentLibWeekStart(n);
+    // Check if user is admin (07mzhou@rpsnj.us)
+    const isAdmin = formData.email.trim().toLowerCase() === '07mzhou@rpsnj.us';
+
+    // Maroon button style
+    function getPrimaryButtonStyle() {
+      return 'bg-[#800000] hover:bg-[#700000] text-white';
     }
-    function nextWeekLib(){
-      const n = new Date(currentLibWeekStart);
-      n.setDate(n.getDate()+7);
-      setCurrentLibWeekStart(n);
+
+    // Banner for library open/closed at top of "Room Availability"
+    function renderLibraryBanner() {
+      if (libraryIsOpen) {
+        return (
+          <div className="p-3 rounded-md bg-green-50 border border-green-400 text-green-800 font-semibold mb-4">
+            Library is OPEN
+          </div>
+        );
+      } else {
+        return (
+          <div className="p-3 rounded-md bg-red-50 border border-red-400 text-red-800 font-semibold mb-4">
+            Library is CLOSED
+          </div>
+        );
+      }
     }
-    const weekDatesLib = getWeekDates(currentLibWeekStart);
 
     return (
       <div className="min-h-screen bg-gray-100 text-gray-900">
         <div className="p-6 max-w-6xl mx-auto">
-          <h1 className="text-2xl font-bold mb-4">Room Reservation System (with Library Status)</h1>
+          <h1 className="text-2xl font-bold mb-4">Room Reservation System</h1>
 
           {/* Tabs */}
           <div className="mb-8 border-b border-gray-200">
             <nav className="flex space-x-4" aria-label="Tabs">
               <button
-                onClick={()=> setActiveTab("rooms")}
+                onClick={() => setActiveTab('rooms')}
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab==="rooms" ? "border-b-2 border-green-600 text-green-600" : "hover:text-gray-700"
+                  activeTab === 'rooms'
+                    ? 'border-b-2 border-[#800000] text-[#800000]'
+                    : 'hover:text-gray-700'
                 }`}
               >
                 Room Availability
               </button>
               <button
-                onClick={()=> setActiveTab("myreservations")}
+                onClick={() => setActiveTab('myreservations')}
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab==="myreservations" ? "border-b-2 border-green-600 text-green-600" : "hover:text-gray-700"
+                  activeTab === 'myreservations'
+                    ? 'border-b-2 border-[#800000] text-[#800000]'
+                    : 'hover:text-gray-700'
                 }`}
               >
                 My Reservations
               </button>
               <button
-                onClick={()=> setActiveTab("calendar")}
+                onClick={() => setActiveTab('calendar')}
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab==="calendar" ? "border-b-2 border-green-600 text-green-600" : "hover:text-gray-700"
+                  activeTab === 'calendar'
+                    ? 'border-b-2 border-[#800000] text-[#800000]'
+                    : 'hover:text-gray-700'
                 }`}
               >
                 Calendar
               </button>
               <button
-                onClick={()=> setActiveTab("libstatus")}
+                onClick={() => setActiveTab('rules')}
                 className={`px-3 py-2 text-sm font-medium ${
-                  activeTab==="libstatus" ? "border-b-2 border-green-600 text-green-600" : "hover:text-gray-700"
-                }`}
-              >
-                Library Status
-              </button>
-              <button
-                onClick={()=> setActiveTab("rules")}
-                className={`px-3 py-2 text-sm font-medium ${
-                  activeTab==="rules" ? "border-b-2 border-green-600 text-green-600" : "hover:text-gray-700"
+                  activeTab === 'rules'
+                    ? 'border-b-2 border-[#800000] text-[#800000]'
+                    : 'hover:text-gray-700'
                 }`}
               >
                 Rules & Guidelines
@@ -371,31 +366,33 @@
 
           {/* Notification */}
           {notification && (
-            <div className={`mt-4 p-4 rounded-md ${
-              notification.type==="error" ? "bg-red-50 text-red-800" : "bg-green-50 text-green-800"
-            }`}>
-              {notification.msg}
+            <div
+              className={`mt-4 p-4 rounded-md ${
+                notification.type === 'error' ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'
+              }`}
+            >
+              {notification.message}
             </div>
           )}
 
           {/* ROOMS TAB */}
-          {activeTab==="rooms" && (
+          {activeTab === 'rooms' && (
             <div className="mt-4 space-y-8">
-              {/* Show today's library status on top */}
-              <LibraryStatusIndicator dateStr={todayStr} getStatus={getLibraryStatus}/>
+              {/* Library banner: green if open, red if closed */}
+              {renderLibraryBanner()}
 
-              {/* Grid of today's reservations for each room */}
+              {/* Today's reservations */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {rooms.map(rm=>{
-                  const todays = getRoomReservationsToday(rm);
+                {rooms.map(room => {
+                  const todays = getRoomReservationsToday(room);
                   return (
-                    <div key={rm} className="rounded-md shadow p-4 bg-white">
-                      <h2 className="text-lg font-bold mb-2">Room {rm}</h2>
+                    <div key={room} className="rounded-md shadow p-4 bg-white">
+                      <h2 className="text-lg font-bold mb-2">Room {room}</h2>
                       <div className="space-y-2">
-                        {todays.length===0 ? (
+                        {todays.length === 0 ? (
                           <p className="text-sm text-gray-600">No reservations today</p>
-                        ):(
-                          todays.map(res=>(
+                        ) : (
+                          todays.map(res => (
                             <div key={res.id} className="p-2 bg-gray-50 rounded-md text-sm mb-2">
                               Period {res.period} is reserved
                             </div>
@@ -418,12 +415,17 @@
                       <select
                         className="w-full border border-gray-300 rounded-md p-2"
                         value={formData.room}
-                        onChange={e=>handleChange('room', e.target.value)}
+                        onChange={e => handleChange('room', e.target.value)}
                       >
                         <option value="">Select room</option>
-                        {rooms.map(r=><option key={r} value={r}>Room {r}</option>)}
+                        {rooms.map(r => (
+                          <option key={r} value={r}>
+                            Room {r}
+                          </option>
+                        ))}
                       </select>
                     </div>
+
                     {/* Date */}
                     <div className="space-y-2">
                       <label className="block text-sm font-medium">Date</label>
@@ -431,22 +433,28 @@
                         type="date"
                         className="w-full border border-gray-300 rounded-md p-2"
                         value={formData.date}
-                        onChange={e=>handleChange('date', e.target.value)}
+                        onChange={e => handleChange('date', e.target.value)}
                         min={todayStr}
                         max={maxDateStr}
                       />
                     </div>
+
                     {/* Period */}
                     <div className="space-y-2">
                       <label className="block text-sm font-medium">Period (1-8)</label>
                       <select
                         className="w-full border border-gray-300 rounded-md p-2"
                         value={formData.period}
-                        onChange={e=>handleChange('period', e.target.value)}
+                        onChange={e => handleChange('period', e.target.value)}
                       >
-                        {periods.map(p=><option key={p} value={p}>Period {p}</option>)}
+                        {periods.map(per => (
+                          <option key={per} value={per}>
+                            Period {per}
+                          </option>
+                        ))}
                       </select>
                     </div>
+
                     {/* Name */}
                     <div className="space-y-2">
                       <label className="block text-sm font-medium">Name</label>
@@ -455,9 +463,10 @@
                         className="w-full border border-gray-300 rounded-md p-2"
                         placeholder="Your name"
                         value={formData.name}
-                        onChange={e=>handleChange('name', e.target.value)}
+                        onChange={e => handleChange('name', e.target.value)}
                       />
                     </div>
+
                     {/* Email */}
                     <div className="space-y-2">
                       <label className="block text-sm font-medium">Email (@rpsnj.us)</label>
@@ -466,24 +475,30 @@
                         className="w-full border border-gray-300 rounded-md p-2"
                         placeholder="your.email@rpsnj.us"
                         value={formData.email}
-                        onChange={e=>handleChange('email', e.target.value)}
+                        onChange={e => handleChange('email', e.target.value)}
                       />
                     </div>
+
                     {/* People */}
                     <div className="space-y-2">
                       <label className="block text-sm font-medium">Number of People (1-12)</label>
                       <select
                         className="w-full border border-gray-300 rounded-md p-2"
                         value={formData.people}
-                        onChange={e=>handleChange('people', e.target.value)}
+                        onChange={e => handleChange('people', e.target.value)}
                       >
-                        {Array.from({length:12},(_,i)=>(i+1).toString()).map(n=><option key={n} value={n}>{n} {n==='1'?"person":"people"}</option>)}
+                        {Array.from({ length: 12 }, (_, i) => (i + 1).toString()).map(num => (
+                          <option key={num} value={num}>
+                            {num} {num === '1' ? 'person' : 'people'}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
+
                   <button
                     type="submit"
-                    className="w-full mt-4 p-2 rounded-md bg-[#800000] hover:bg-[#700000] text-white"
+                    className={`w-full mt-4 p-2 rounded-md ${getPrimaryButtonStyle()}`}
                   >
                     Book Room
                   </button>
@@ -493,41 +508,175 @@
           )}
 
           {/* MY RESERVATIONS */}
-          {activeTab==="myreservations" && (
-            <MyReservationsTab
-              formData={formData}
-              handleChange={handleChange}
-              reservations={reservations}
-              cancelReservation={cancelReservation}
-              toggleCheckIn={toggleCheckIn}
-              checkOutReservation={checkOutReservation}
-              isAdmin={isAdmin}
-              showNotification={showNotification}
-            />
+          {activeTab === 'myreservations' && (
+            <div className="mt-4">
+              <div className="rounded-md shadow p-4 bg-white">
+                <h2 className="text-lg font-bold mb-4">My Current Reservations</h2>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">
+                    Enter your @rpsnj.us email to view/cancel reservations
+                  </label>
+                  <input
+                    type="email"
+                    className="w-full border border-gray-300 rounded-md p-2"
+                    placeholder="your.email@rpsnj.us"
+                    value={formData.email}
+                    onChange={e => handleChange('email', e.target.value)}
+                  />
+                </div>
+
+                {formData.email.toLowerCase().endsWith('@rpsnj.us') ? (
+                  // ADMIN (07mzhou@rpsnj.us): show ALL reservations with Name & Email
+                  formData.email.trim().toLowerCase() === '07mzhou@rpsnj.us' ? (
+                    <div className="space-y-4">
+                      <h3 className="text-md font-semibold text-red-700">Admin Access: Viewing all reservations</h3>
+                      
+                      {reservations.length === 0 ? (
+                        <p className="text-gray-500 text-center py-4">
+                          No reservations found at all.
+                        </p>
+                      ) : (
+                        reservations.map(res => (
+                          <div
+                            key={res.id}
+                            className="p-4 border border-gray-200 rounded-lg bg-gray-50 flex justify-between items-center"
+                          >
+                            <div>
+                              <p className="font-medium">Name: {res.name}, Email: {res.email}</p>
+                              <p className="text-sm mt-1">
+                                Room: {res.room}, Date: {res.date}, Period: {res.period}, People: {res.people}
+                              </p>
+                              <p className="text-sm mt-1">
+                                Check-In Status: 
+                                <button
+                                  className="ml-2 px-3 py-1 rounded-md bg-gray-300 cursor-default"
+                                  disabled
+                                >
+                                  {res.checkedIn}
+                                </button>
+                              </p>
+                            </div>
+                            <div className="space-x-2">
+                              {/* Cancel button */}
+                              <button
+                                onClick={() => cancelReservation(res.id)}
+                                className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
+                              >
+                                Cancel
+                              </button>
+
+                              {/* Check In / Uncheck In button */}
+                              {res.checkedIn === 'Checked In' ? (
+                                <button
+                                  onClick={() => toggleCheckIn(res.id)}
+                                  className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
+                                >
+                                  Uncheck In
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => toggleCheckIn(res.id)}
+                                  className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
+                                >
+                                  Check In
+                                </button>
+                              )}
+
+                              {/* Check Out button */}
+                              <button
+                                onClick={() => checkOutReservation(res.id)}
+                                className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
+                              >
+                                Check Out
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    // Normal user (non-admin)
+                    <div className="space-y-4">
+                      {myReservations().length === 0 ? (
+                        <p className="text-gray-500 text-center py-4">
+                          No reservations found for this email.
+                        </p>
+                      ) : (
+                        myReservations().map(res => (
+                          <div
+                            key={res.id}
+                            className="p-4 border border-gray-200 rounded-lg bg-gray-50 flex justify-between items-center"
+                          >
+                            <div>
+                              <p className="font-medium">
+                                Room: {res.room}, Date: {res.date}, Period: {res.period}, People: {res.people}
+                              </p>
+                              <p className="text-sm mt-1">
+                                Check-In Status:
+                                <button
+                                  className="ml-2 px-3 py-1 rounded-md bg-gray-300 cursor-default"
+                                  disabled
+                                >
+                                  {res.checkedIn}
+                                </button>
+                              </p>
+                            </div>
+                            <div className="space-x-2">
+                              {/* Cancel */}
+                              <button
+                                onClick={() => cancelReservation(res.id)}
+                                className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
+                              >
+                                Cancel
+                              </button>
+
+                              {/* Check Out (for user) */}
+                              <button
+                                onClick={() => checkOutReservation(res.id)}
+                                className={`px-4 py-2 rounded-md ${getPrimaryButtonStyle()}`}
+                              >
+                                Check Out
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )
+                ) : (
+                  <p className="text-gray-500 text-center py-4">
+                    Please enter your @rpsnj.us email to view your reservations.
+                  </p>
+                )}
+              </div>
+            </div>
           )}
 
-          {/* CALENDAR TAB (weekly reservations) */}
-          {activeTab==="calendar" && (
+          {/* CALENDAR TAB (Weekly) */}
+          {activeTab === 'calendar' && (
             <div className="mt-4 space-y-4">
               <div className="rounded-md shadow p-4 bg-white flex justify-between items-center">
                 <button
-                  onClick={()=>{
+                  onClick={() => {
                     const newStart = new Date(currentWeekStart);
-                    newStart.setDate(newStart.getDate()-7);
+                    newStart.setDate(newStart.getDate() - 7);
                     setCurrentWeekStart(newStart);
                   }}
-                  className="px-3 py-1 rounded-md bg-[#800000] hover:bg-[#700000] text-white"
+                  className={`px-3 py-1 rounded-md ${getPrimaryButtonStyle()}`}
                 >
                   ‹ Prev
                 </button>
-                <h2 className="text-lg font-bold">Week of {formatWeekTitle(currentWeekStart)}</h2>
+                <h2 className="text-lg font-bold">
+                  Week of {formatWeekStart(currentWeekStart)}
+                </h2>
                 <button
-                  onClick={()=>{
+                  onClick={() => {
                     const newStart = new Date(currentWeekStart);
-                    newStart.setDate(newStart.getDate()+7);
+                    newStart.setDate(newStart.getDate() + 7);
                     setCurrentWeekStart(newStart);
                   }}
-                  className="px-3 py-1 rounded-md bg-[#800000] hover:bg-[#700000] text-white"
+                  className={`px-3 py-1 rounded-md ${getPrimaryButtonStyle()}`}
                 >
                   Next ›
                 </button>
@@ -538,23 +687,29 @@
                   <thead>
                     <tr className="border-b border-gray-200">
                       <th className="p-2 text-left">Period \ Date</th>
-                      {getWeekDates(currentWeekStart).map((d,i)=>(
-                        <th key={i} className="p-2 text-center">{formatDayHeader(d)}</th>
+                      {weekDates.map((d, idx) => (
+                        <th key={idx} className="p-2 text-center">
+                          {formatDayHeader(d)}
+                        </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {periods.map(p=>(
+                    {periods.map(p => (
                       <tr key={p} className="border-b border-gray-200">
                         <td className="p-2 font-medium text-center">Period {p}</td>
-                        {getWeekDates(currentWeekStart).map((dayD,colIdx)=>{
-                          const dayRes = getReservationsForDayAndPeriod(dayD,p);
-                          if(dayRes.length===0){
-                            return <td key={colIdx} className="p-2 text-center text-gray-500">–</td>;
+                        {weekDates.map((dayD, colIdx) => {
+                          const dayRes = getReservationsForDayAndPeriod(dayD, p);
+                          if (dayRes.length === 0) {
+                            return (
+                              <td key={colIdx} className="p-2 text-center text-gray-500">
+                                –
+                              </td>
+                            );
                           }
                           return (
                             <td key={colIdx} className="p-2 text-center">
-                              {dayRes.map(rObj=>(
+                              {dayRes.map(rObj => (
                                 <div key={rObj.id} className="text-sm">
                                   Room {rObj.room}
                                 </div>
@@ -570,102 +725,12 @@
             </div>
           )}
 
-          {/* LIBRARY STATUS TAB */}
-          {activeTab==="libstatus" && (
-            <div className="mt-4 space-y-4">
-              <div className="rounded-md shadow p-4 bg-white flex justify-between items-center">
-                <button
-                  onClick={()=>{
-                    const newStart = new Date(currentLibWeekStart);
-                    newStart.setDate(newStart.getDate()-7);
-                    setCurrentLibWeekStart(newStart);
-                  }}
-                  className="px-3 py-1 rounded-md bg-green-600 hover:bg-green-500 text-white"
-                >
-                  ‹ Prev
-                </button>
-                <h2 className="text-lg font-bold">Library Status for Week of {formatWeekTitle(currentLibWeekStart)}</h2>
-                <button
-                  onClick={()=>{
-                    const newStart = new Date(currentLibWeekStart);
-                    newStart.setDate(newStart.getDate()+7);
-                    setCurrentLibWeekStart(newStart);
-                  }}
-                  className="px-3 py-1 rounded-md bg-green-600 hover:bg-green-500 text-white"
-                >
-                  Next ›
-                </button>
-              </div>
-
-              <div className="rounded-md shadow overflow-x-auto bg-white">
-                <table className="min-w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="p-2 text-left">Day</th>
-                      {getWeekDates(currentLibWeekStart).map((d,i)=>(
-                        <th key={i} className="p-2 text-center">{formatDayHeader(d)}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* We'll just do 1 row that says "Status" */}
-                    <tr className="border-b border-gray-200">
-                      <td className="p-2 font-medium text-center">Status</td>
-                      {getWeekDates(currentLibWeekStart).map((dayD,colIdx)=>{
-                        const ds = dayD.toISOString().split('T')[0];
-                        const status = getLibraryStatus(ds);
-
-                        // If admin => show toggle button
-                        // If open => green button. If closed => red button.
-                        // Non-admin => just text "Open"/"Closed"
-                        if(isAdmin){
-                          // Admin
-                          if(status==="Open"){
-                            return (
-                              <td key={colIdx} className="p-2 text-center">
-                                <button
-                                  onClick={()=>toggleLibraryStatus(ds)}
-                                  className="px-3 py-2 bg-green-600 hover:bg-green-500 text-white rounded"
-                                >
-                                  OPEN
-                                </button>
-                              </td>
-                            );
-                          } else {
-                            return (
-                              <td key={colIdx} className="p-2 text-center">
-                                <button
-                                  onClick={()=>toggleLibraryStatus(ds)}
-                                  className="px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded"
-                                >
-                                  CLOSED
-                                </button>
-                              </td>
-                            );
-                          }
-                        } else {
-                          // Non-admin => just show text
-                          return (
-                            <td key={colIdx} className={`p-2 text-center font-semibold ${
-                              status==="Open" ? "text-green-600" : "text-red-600"
-                            }`}>
-                              {status.toUpperCase()}
-                            </td>
-                          );
-                        }
-                      })}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
           {/* RULES TAB */}
-          {activeTab==="rules" && (
+          {activeTab === 'rules' && (
             <div className="mt-4 space-y-4">
               <div className="rounded-md shadow p-4 bg-white">
                 <h2 className="text-lg font-bold">Conference Room Rules & Guidelines</h2>
+
                 <div className="mt-4">
                   <h3 className="font-semibold mb-2">Attendance Policy</h3>
                   <p>
@@ -674,6 +739,7 @@
                     available for immediate booking by other users.
                   </p>
                 </div>
+
                 <div className="mt-4">
                   <h3 className="font-semibold mb-2">Booking Guidelines</h3>
                   <ul className="list-disc pl-5 space-y-2">
@@ -684,6 +750,7 @@
                     <li>Keep the room clean and organized for the next group</li>
                   </ul>
                 </div>
+
                 <div className="mt-4">
                   <h3 className="font-semibold mb-2">Room Usage</h3>
                   <ul className="list-disc pl-5 space-y-2">
@@ -696,186 +763,12 @@
               </div>
             </div>
           )}
-
         </div>
       </div>
     );
   }
 
-  // At the top of the "rooms" tab, show if library is open or closed for "today" in a nice style
-  function LibraryStatusIndicator({ dateStr, getStatus }){
-    const status = getStatus(dateStr);
-    if(status==="Open"){
-      return (
-        <div className="p-3 rounded-md bg-green-50 border border-green-400 text-green-800 font-semibold">
-          Library is OPEN today
-        </div>
-      );
-    } else {
-      return (
-        <div className="p-3 rounded-md bg-red-50 border border-red-400 text-red-800 font-semibold">
-          Library is CLOSED today
-        </div>
-      );
-    }
-  }
-
-  // MyReservations sub-component
-  function MyReservationsTab({
-    formData,
-    handleChange,
-    reservations,
-    cancelReservation,
-    toggleCheckIn,
-    checkOutReservation,
-    isAdmin,
-    showNotification
-  }){
-    // Filter user reservations
-    function myReservations(){
-      return reservations
-        .filter(r=> r.email===formData.email.trim().toLowerCase())
-        .sort((a,b)=> parseLocalDate(a.date)-parseLocalDate(b.date));
-    }
-
-    return (
-      <div className="mt-4">
-        <div className="rounded-md shadow p-4 bg-white">
-          <h2 className="text-lg font-bold mb-4">My Current Reservations</h2>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">
-              Enter your @rpsnj.us email to view/cancel reservations
-            </label>
-            <input
-              type="email"
-              className="w-full border border-gray-300 rounded-md p-2"
-              placeholder="your.email@rpsnj.us"
-              value={formData.email}
-              onChange={e=>handleChange('email', e.target.value)}
-            />
-          </div>
-
-          {formData.email.toLowerCase().endsWith('@rpsnj.us') ? (
-            isAdmin ? (
-              // Admin => see ALL reservations
-              <div className="space-y-4">
-                <h3 className="text-md font-semibold text-red-700">
-                  Admin Access: Viewing all reservations
-                </h3>
-                {reservations.length===0 ? (
-                  <p className="text-gray-500 text-center py-4">No reservations found at all.</p>
-                ) : (
-                  reservations.map(res=>(
-                    <div
-                      key={res.id}
-                      className="p-4 border border-gray-200 rounded-lg bg-gray-50 flex justify-between items-center"
-                    >
-                      <div>
-                        <p className="font-medium">Name: {res.name}, Email: {res.email}</p>
-                        <p className="text-sm mt-1">
-                          Room: {res.room}, Date: {res.date}, Period: {res.period}, People: {res.people}
-                        </p>
-                        <p className="text-sm mt-1">
-                          Check-In Status: 
-                          <button
-                            className="ml-2 px-3 py-1 rounded-md bg-gray-300 cursor-default"
-                            disabled
-                          >
-                            {res.checkedIn}
-                          </button>
-                        </p>
-                      </div>
-                      <div className="space-x-2">
-                        <button
-                          onClick={()=> cancelReservation(res.id)}
-                          className="px-4 py-2 rounded-md bg-[#800000] hover:bg-[#700000] text-white"
-                        >
-                          Cancel
-                        </button>
-                        {res.checkedIn==="Checked In" ? (
-                          <button
-                            onClick={()=> toggleCheckIn(res.id)}
-                            className="px-4 py-2 rounded-md bg-[#800000] hover:bg-[#700000] text-white"
-                          >
-                            Uncheck In
-                          </button>
-                        ) : (
-                          <button
-                            onClick={()=> toggleCheckIn(res.id)}
-                            className="px-4 py-2 rounded-md bg-[#800000] hover:bg-[#700000] text-white"
-                          >
-                            Check In
-                          </button>
-                        )}
-                        <button
-                          onClick={()=> checkOutReservation(res.id)}
-                          className="px-4 py-2 rounded-md bg-[#800000] hover:bg-[#700000] text-white"
-                        >
-                          Check Out
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            ) : (
-              // Normal user => see only their reservations
-              <div className="space-y-4">
-                {myReservations().length===0 ? (
-                  <p className="text-gray-500 text-center py-4">
-                    No reservations found for this email.
-                  </p>
-                ) : (
-                  myReservations().map(res=>(
-                    <div
-                      key={res.id}
-                      className="p-4 border border-gray-200 rounded-lg bg-gray-50 flex justify-between items-center"
-                    >
-                      <div>
-                        <p className="font-medium">
-                          Room: {res.room}, Date: {res.date}, Period: {res.period}, People: {res.people}
-                        </p>
-                        <p className="text-sm mt-1">
-                          Check-In Status:
-                          <button
-                            className="ml-2 px-3 py-1 rounded-md bg-gray-300 cursor-default"
-                            disabled
-                          >
-                            {res.checkedIn}
-                          </button>
-                        </p>
-                      </div>
-                      <div className="space-x-2">
-                        <button
-                          onClick={()=> cancelReservation(res.id)}
-                          className="px-4 py-2 rounded-md bg-[#800000] hover:bg-[#700000] text-white"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={()=> checkOutReservation(res.id)}
-                          className="px-4 py-2 rounded-md bg-[#800000] hover:bg-[#700000] text-white"
-                        >
-                          Check Out
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )
-          ) : (
-            <p className="text-gray-500 text-center py-4">
-              Please enter your @rpsnj.us email to view your reservations.
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  ReactDOM.render(<ConferenceRoomSystem/>, document.getElementById('root'));
+  ReactDOM.render(<ConferenceRoomSystem />, document.getElementById('root'));
 </script>
 </body>
 </html>
