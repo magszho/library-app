@@ -7,13 +7,13 @@ dotenv.config();
 const app: Express = express();
 const port = process.env.PORT || 5000;
 
-app.use(express.static(path.join(__dirname, '../build')));
+app.use(express.static(path.join(__dirname, '../static')));
 app.get("/test", (req: Request, res: Response) => {
     res.send("here's a silly message");
 });
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../build', 'website.html'));
+    res.sendFile(path.join(__dirname, '../static', 'website.html'));
 });
 
 
