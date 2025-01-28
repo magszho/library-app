@@ -20,18 +20,6 @@ const ReservationSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     required: true
   },
-  // reserved: {
-  //   type: String,
-  //   required: true,
-  //   enum: Object.values(ReservationState),
-  //   default: ReservationState.NotOpen,
-  // },
-  // checkin: {
-  //   type: String,
-  //   required: true,
-  //   enum: Object.values(CheckInState),
-  //   default: CheckInState.Pending,
-  // },
   user: {
     type: mongoose.Schema.Types.ObjectId,
     required: false,

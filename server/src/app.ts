@@ -37,31 +37,6 @@ interface ReservationQuery {
 app.use("/", reservationsRouter);
 app.use("/", roomRouter);   
 app.use("/", usersRouter);
-// app.get('/reservations', async (
-//     req: Request<{}, {}, {}, ReservationQuery>,
-//     res: Response
-// ): Promise<void> => {
-//     console.log("hi received this route");
-//     const { roomStr, date } = req.query;
-//     // const roomStr = "101";
-//     // const date: Date = new Date("2025-01-24");
-//     try {
-//         // if date is too far in advance then reservation state is not open
-//         // const reservations = await Reservation.find({ room: room, date: date })
-//         //   .populate('user', 'email').populate('room', 'name').populate('date', 'date').exec();
-//         const room = await Room.findOne({name: roomStr}).exec();
-//         // if (!room) {
-//         //     res.status(400).send({error: "Room not found: " + roomStr});
-//         //     return;
-//         //   }
-//         const reservations = await Reservation.find({ room: room, date: date }).exec();
-//         const pageTitle = "Reservations for " + room + " on " + date.toDateString();
-//         res.json({title: pageTitle, reservations: reservations});
-//         // res.render("reservations", {title: pageTitle, reservations: reservations});
-//     } catch (error) {
-//         res.status(400).send(error);
-//     }
-// });
 
 
 app.listen(port, () => {

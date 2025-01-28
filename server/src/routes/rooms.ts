@@ -36,9 +36,7 @@ roomRouter.post('/rooms', async (req: Request<{}, {}, CreateRoomBody, {}, {}>, r
     }
 
     const room = new Room({ name: roomName });
-    await room.save();
-    console.log("room saved: ", room);
-    
+    await room.save();  
     res.status(201).json(room);
   } catch (error) {
     res.status(400).json({ error: 'Failed to create room' });

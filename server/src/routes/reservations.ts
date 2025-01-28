@@ -16,7 +16,6 @@ reservationsRouter.get('/reservations', async (
   req: Request<{}, {}, {}, ReservationQuery>,
   res: Response
 ): Promise<void> => {
-  console.log(req.query);
   const { roomStr, dateStr } = req.query;
   const date = new Date(dateStr); // needs to be in current timezone
   try {
@@ -50,7 +49,6 @@ reservationsRouter.post('/reservations', async (
   req: Request<{}, {}, CreateReservationBody, {}, {}>,
   res: Response
 ): Promise<void> => {
-  console.log(req.body);
   try {
     const { roomStr, dateStr, periodNum, userEmail } = req.body;
     
@@ -67,11 +65,9 @@ reservationsRouter.post('/reservations', async (
     
     // Check for existing reservation
     const room = await Room.findOne({name: roomStr}).exec();
-    const schoolDay = await SchoolDay.findOne({date: new Date(dateStr)}).exec();
-    // const period = await Period.findOne({number: periodNum}).exec();
     let existingReservation = await Reservation.findOne({
       room: room,
-      date: schoolDay,
+      date: bookingDate,
       period: periodNum
     }).exec();
 
@@ -91,7 +87,7 @@ reservationsRouter.post('/reservations', async (
       reserved: { Reserved: true },
       checkIn: { Pending: true },
       user: user.id,
-      date: schoolDay,
+      date: bookingDate,
       period: periodNum
     });
     await reservation.save();

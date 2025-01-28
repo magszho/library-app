@@ -22,6 +22,20 @@ try {
 }
 });
 
+userRouter.get('/users', async (req: Request<{}, {}, {}, {email: string}>, res: Response): Promise<void> => {
+    const { email } = req.query;
+    try {
+        const user = await User.findOne({ email: email }).exec();
+        if (!user) {
+            res.status(404).send({ message: 'User not found' });
+                return;
+        }
+        res.status(200).json(user);
+    } catch (error) {
+        res.status(500).send({ error: 'Error occurred while finding user' });
+    }
+});
+
 userRouter.post('/users', async (req: Request<{}, {}, {firstName: string, lastName: string, email: string}, {}, {}>, res: Response) => {
     const { firstName, lastName, email } = req.body;
     const user = await User.findOne({ email: email }).exec();
