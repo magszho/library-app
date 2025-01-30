@@ -17,14 +17,28 @@ roomRouter.get('/rooms/:roomId', async (req: Request<{roomId: ObjectId}, {}, {},
   }
 });
 
-roomRouter.get('/rooms', async (req: Request<{}, {}, {}, {roomName: string}>, res: Response) => {
+// roomRouter.get('/rooms', async (req: Request<{}, {}, {}, {roomName: string}>, res: Response) => {
+//     try {
+//         const room = await Room.findOne({name: req.query.roomName}).exec();
+//         res.status(200).json(room);
+//     } catch (error) {
+//         res.status(400).json({ error: 'Failed to fetch room ' + req.query.roomName });
+//     }
+// });
+
+roomRouter.get('/rooms', async (req: Request<{}, {}, {}, {roomName?: string}>, res: Response) => {
     try {
-        const room = await Room.findOne({name: req.query.roomName}).exec();
-        res.status(200).json(room);
+        let query = {};
+        if (req.query.roomName) {
+            query = { name: req.query.roomName };
+        }
+        const rooms = await Room.find(query).exec();
+        res.status(200).json(rooms);
     } catch (error) {
-        res.status(400).json({ error: 'Failed to fetch room ' + req.query.roomName });
+        res.status(400).json({ error: 'Failed to fetch rooms' });
     }
 });
+
 
 roomRouter.post('/rooms', async (req: Request<{}, {}, CreateRoomBody, {}, {}>, res: Response) => {
   try {

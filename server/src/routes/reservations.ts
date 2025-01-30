@@ -1,15 +1,13 @@
 import { Router, Request, Response } from 'express';
-import { Reservation, ReservationState, CheckInState } from '../models/Reservation';
+import { Reservation } from '../models/Reservation';
 import { Room } from '../models/Room';
-import { SchoolDay } from '../models/SchoolDay';
-import { Period } from '../models/Period';
 import { User } from '../models/User';
-import { getTodayStr, parseLocalDate } from './helpers';
+import { getTodayStr, parseLocalDate, getDateStr } from './helpers';
 const reservationsRouter = Router();
 
 interface ReservationQuery {
     roomStr: string,
-    dateStr: string
+    dateStr: string,
 };
 
 reservationsRouter.get('/reservations', async (
@@ -17,7 +15,9 @@ reservationsRouter.get('/reservations', async (
   res: Response
 ): Promise<void> => {
   const { roomStr, dateStr } = req.query;
-  const date = new Date(dateStr); // needs to be in current timezone
+  console.log(roomStr, dateStr);
+  const date = new Date(dateStr);
+  console.log("Date:", date);
   try {
       // if date is too far in advance then reservation state is not open
       // const reservations = await Reservation.find({ room: room, date: date })
@@ -27,9 +27,9 @@ reservationsRouter.get('/reservations', async (
         res.status(400).send({error: "Room not found: " + roomStr});
         return;
       }
-      const reservations = await Reservation.find({ room: room, date: date }).populate('room', 'name').exec();
-      const pageTitle = "Reservations for " + room.name + " on " + date.toDateString();
-      res.json({title: pageTitle, reservations: reservations});
+      const reservations = await Reservation.find({ room: room, date: date }).populate('room').populate('user').exec();
+      console.log("Reservations for " + room.name + " on " + dateStr);
+      res.json(reservations);
       // res.render("reservations", {title: pageTitle, reservations: reservations});
   } catch (error) {
       res.status(400).send(error);

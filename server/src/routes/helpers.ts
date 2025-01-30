@@ -11,6 +11,10 @@ function getTodayStr(): string {
   return now.toISOString().split('T')[0];
 }
 
+function getDateStr(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
 function getStartOfWeek(date: Date = new Date()): Date {
   const d = new Date(date);
   const dayOfWeek = d.getDay(); // 0=Sun, ...
@@ -45,4 +49,4 @@ function formatWeekStart(dateObj: Date): string {
   });
 }
 
-export { parseLocalDate, getTodayStr, getStartOfWeek, getWeekDates, formatDayHeader, formatWeekStart };
+export { parseLocalDate, getTodayStr, getDateStr, getStartOfWeek, getWeekDates, formatDayHeader, formatWeekStart };

@@ -36,6 +36,15 @@ userRouter.get('/users', async (req: Request<{}, {}, {}, {email: string}>, res: 
     }
 });
 
+// userRouter.get('/users', async (req: Request<{}, {}, {}, {}>, res: Response): Promise<void> => {
+//     try {
+//         const users = await User.find({}).exec();
+//         res.status(200).json(users);
+//     } catch (error) {
+//         res.status(500).send({ error: 'Error occurred while finding users' });
+//     }
+// });
+
 userRouter.post('/users', async (req: Request<{}, {}, {firstName: string, lastName: string, email: string}, {}, {}>, res: Response) => {
     const { firstName, lastName, email } = req.body;
     const user = await User.findOne({ email: email }).exec();

@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import { User } from './User';
-import { Period } from './Period';
 import { Room } from './Room';
 
 enum ReservationState {
@@ -18,7 +17,8 @@ enum CheckInState {
 const ReservationSchema = new mongoose.Schema({
   room: {
     type: mongoose.Schema.Types.ObjectId,
-    required: true
+    required: true,
+    ref: 'Room',
   },
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -27,7 +27,7 @@ const ReservationSchema = new mongoose.Schema({
   },
   date: { 
     type: Date, 
-    required: true 
+    required: true,
   },
   period: { 
     type: Number,
