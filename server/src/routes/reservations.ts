@@ -49,8 +49,13 @@ reservationsRouter.post('/reservations', async (
   req: Request<{}, {}, CreateReservationBody, {}, {}>,
   res: Response
 ): Promise<void> => {
+  console.log("Received request body:", req.body);
   try {
     const { roomStr, dateStr, periodNum, userEmail } = req.body;
+    console.log("Room:", roomStr);
+    console.log("Date:", dateStr);
+    console.log("Period:", periodNum);
+    console.log("User:", userEmail);
     
     // Validate booking time constraints
     const bookingDate = new Date(dateStr);

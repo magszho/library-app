@@ -13,7 +13,7 @@ import roomRouter from './routes/rooms';
 import usersRouter from './routes/users';
 
 const app: Express = express();
-// app.use(express.json());
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 db.once('open', () => {
     console.log("Database connected");
@@ -25,9 +25,9 @@ app.get("/test", (req: Request, res: Response) => {
     res.send("here's a silly message");
 });
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../static', 'website.html'));
-});
+// app.get('/', (req, res) => {
+//     res.sendFile(path.join(__dirname, '../static', 'website.html'));
+// });
 
 interface ReservationQuery {
     roomStr: string,
