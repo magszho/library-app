@@ -1,4 +1,6 @@
 import mongoose, { ConnectOptions } from 'mongoose';
+import dotenv from 'dotenv';
+dotenv.config();
 
 if (!process.env.MONGODB_USER || !process.env.MONGODB_PASSWORD) {
   const error = "MongoDB credentials are missing! Please check your environment variables for MONGODB_USER and MONGODB_PASSWORD";
@@ -16,3 +18,4 @@ mongoose.connect(mongoURL, clientOptions as ConnectOptions).then(() => {
 });
 
 export const db = mongoose.connection;
+export { mongoURL };

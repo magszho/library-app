@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { Reservation } from '../models/Reservation';
 import { Room } from '../models/Room';
-import { User } from '../models/User';
+import { User, IUser } from '../models/User';
 import { getTodayStr, parseLocalDate, getDateStr } from './helpers';
+import { authenticateToken } from '../middleware/auth';
+
 const reservationsRouter = Router();
 
 interface ReservationQuery {
@@ -40,23 +42,36 @@ interface CreateReservationBody {
   roomStr: string;
   dateStr: string;
   periodNum: number;
-  userEmail: string;
 }
 
 const BOOKING_DAYS_CONSTRAINT: number = 2;
 
-reservationsRouter.post('/reservations', async (
-  req: Request<{}, {}, CreateReservationBody, {}, {}>,
+// Create reservation - requires authentication
+reservationsRouter.post('/reservations', authenticateToken, async (
+  req: Request,
   res: Response
 ): Promise<void> => {
   console.log("Received request body:", req.body);
+  console.log("Received request user:", req.userId);
   try {
-    const { roomStr, dateStr, periodNum, userEmail } = req.body;
+    const { roomStr, dateStr, periodNum } = req.body;
+    const userId = req.userId;
+    
+    if (!userId) {
+      res.status(401).send({ error: "Authentication required" });
+      return;
+    }
+
     console.log("Room:", roomStr);
     console.log("Date:", dateStr);
     console.log("Period:", periodNum);
-    console.log("User:", userEmail);
-    
+
+    const userObj = await User.findById(userId).exec() as IUser | null;
+    if (!userObj) {
+      res.status(400).send({error: "User not found"});
+      return;
+    }
+
     // Validate booking time constraints
     const bookingDate = new Date(dateStr);
     const todayStr = getTodayStr();
@@ -76,28 +91,22 @@ reservationsRouter.post('/reservations', async (
       period: periodNum
     }).exec();
 
-    if (existingReservation != null) {
+    if (existingReservation) {
       res.status(400).send({error: "Reservation already exists"});
-      return;
-    }
-    
-    const user = await User.findOne({email: userEmail}).exec();
-    if (!user) {
-      res.status(400).send({error: "User not found: " + userEmail});
       return;
     }
 
     const reservation = new Reservation({
-      room,
-      reserved: { Reserved: true },
-      checkIn: { Pending: true },
-      user: user.id,
+      room: room,
+      user: userObj._id,
       date: bookingDate,
       period: periodNum
     });
+    
     await reservation.save();
     res.status(200).send(reservation);
   } catch (error) {
+    console.error('Reservation error:', error);
     res.status(400).send(error);
   }
 });

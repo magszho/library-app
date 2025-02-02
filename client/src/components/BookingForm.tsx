@@ -4,7 +4,7 @@ import { Room } from '../types';
 interface BookingFormProps {
   isOpen: boolean;
   onClose: () => void; 
-  onSubmit: (data: {email: string}) => void;
+  onSubmit: () => void;
   room: Room;
   period: number;
 }
@@ -16,13 +16,11 @@ export const BookingForm = ({
   room, 
   period 
 }: BookingFormProps) => {
-  const [email, setEmail] = useState('');
   if (!isOpen) return null; // dont show stuff if form isnt open
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();  // prevent the page from refreshing
-    onSubmit({ email });  // give the email to the parent component
-    setEmail('');  // clear the email field
+    onSubmit();  // give the email to the parent component
   };
 
   return (
@@ -32,19 +30,6 @@ export const BookingForm = ({
         <p className="mb-4">Period {period}</p>
         
         <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">
-              Email:
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-2 border rounded focus:outline-none focus:border-blue-500"
-              required
-            />
-          </div>
-          
           <div className="flex justify-end gap-2">
             <button
               type="button"

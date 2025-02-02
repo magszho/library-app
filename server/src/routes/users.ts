@@ -45,14 +45,14 @@ userRouter.get('/users', async (req: Request<{}, {}, {}, {email: string}>, res: 
 //     }
 // });
 
-userRouter.post('/users', async (req: Request<{}, {}, {firstName: string, lastName: string, email: string}, {}, {}>, res: Response) => {
-    const { firstName, lastName, email } = req.body;
+userRouter.post('/users', async (req: Request<{}, {}, {name: string, email: string}, {}, {}>, res: Response) => {
+    const { name, email } = req.body;
     const user = await User.findOne({ email: email }).exec();
     if (user) {
         res.status(400).send({ error: 'User with email ' + email + ' already exists' });
         return;
     }
-    const newUser = new User({ firstName: firstName, lastName: lastName, email: email });
+    const newUser = new User({ name: name, email: email });
     await newUser.save();
     res.status(200).json(newUser);
 });

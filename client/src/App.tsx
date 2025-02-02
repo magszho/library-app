@@ -5,6 +5,11 @@ import { Room, Reservation } from './types';
 import { DateSelector } from './components/DateSelector';
 import { ReservationTable } from './components/ReservationTable';
 import { BookingForm } from './components/BookingForm';
+import { NavBar } from './components/NavBar';
+import { MyReservations } from './components/MyReservations';
+import { Login } from './components/Login';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthCallback } from './components/AuthCallback';
 
 function App() {
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -14,6 +19,9 @@ function App() {
   const [formOpen, setFormOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ room: Room; period: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'book' | 'myReservations' | 'login'>('book');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>('');
 
   // Fetch all rooms when component mounts
   useEffect(() => {
@@ -47,9 +55,9 @@ function App() {
     }
   };
 
-  const makeReservation = async (roomStr: string, dateStr: string, periodNum: number, userEmail: string) => {
+  const makeReservation = async (roomStr: string, dateStr: string, periodNum: number) => {
     try {
-      console.log("Making reservation for room:", roomStr, "date:", dateStr, "period:", periodNum, "user:", userEmail);
+      console.log("Making reservation for room:", roomStr, "date:", dateStr, "period:", periodNum);
       const response = await fetch('/reservations', {
         method: 'POST',
         headers: {
@@ -58,8 +66,7 @@ function App() {
         body: JSON.stringify({
           roomStr,
           dateStr, 
-          periodNum,
-          userEmail
+          periodNum
         })
       });
 
@@ -105,7 +112,7 @@ function App() {
   };
 
   /** helper function when the form is submitted to handle the room reservation */
-  const handleFormSubmit = async ({ email }: { email: string }) => {
+  const handleFormSubmit = async () => {
     if (!selectedSlot) return;
 
     try {
@@ -113,9 +120,7 @@ function App() {
       const responseData = await makeReservation(
         selectedSlot.room.name,
         dateStr,
-        selectedSlot.period,
-        email
-      );
+        selectedSlot.period);
       console.log("Response data:", responseData);
 
       setFormOpen(false);
@@ -129,37 +134,60 @@ function App() {
   // console.log("Reservations:", reservations);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-6xl mx-auto flex flex-col items-center">
-        <h1 className="text-2xl font-bold mb-4">Library Room Reservations</h1>
-        
-        <DateSelector 
-          selectedDate={selectedDate}
-          onChange={(date) => setSelectedDate(date ?? new Date())}
-        />
+    <BrowserRouter>
+      <div className="min-h-screen bg-gray-100 p-6">
+        <div className="max-w-6xl mx-auto flex flex-col items-center">
+          <h1 className="text-2xl font-bold mb-4">Library Room Reservations</h1>
+          
+          <NavBar 
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            isLoggedIn={isLoggedIn}
+          />
 
-        {loading ? (
-          <div className="text-center">Loading...</div>
-        ) : (
-          <ReservationTable 
-            rooms={rooms}
-            getReservation={getReservation}
-            onSlotClick={handleBooking}
+          <Routes>
+            <Route path="/auth/google-callback" element={<AuthCallback />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={
+              activeTab === 'book' ? (
+                <>
+                  <DateSelector 
+                    selectedDate={selectedDate}
+                    onChange={(date) => setSelectedDate(date ?? new Date())}
+                  />
+                  {loading ? (
+                    <div className="text-center">Loading...</div>
+                  ) : (
+                    <ReservationTable 
+                      rooms={rooms}
+                      getReservation={getReservation}
+                      onSlotClick={handleBooking}
+                    />
+                  )}
+                </>
+              ) : activeTab === 'myReservations' ? (
+                <MyReservations 
+                  reservations={reservations}
+                  userEmail={userEmail}
+                />
+              ) : (
+                <Login />
+              )
+            } />
+          </Routes>
+        </div>
+
+        {selectedSlot && (
+          <BookingForm
+            isOpen={formOpen}
+            onClose={() => setFormOpen(false)}
+            onSubmit={handleFormSubmit}
+            room={selectedSlot.room}
+            period={selectedSlot.period}
           />
         )}
       </div>
-
-      {/* Show the booking form if a slot was selected */}
-      {selectedSlot && (
-        <BookingForm
-          isOpen={formOpen}
-          onClose={() => setFormOpen(false)}
-          onSubmit={handleFormSubmit}
-          room={selectedSlot.room}
-          period={selectedSlot.period}
-        />
-      )}
-    </div>
+    </BrowserRouter>
   );
 }
 
