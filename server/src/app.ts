@@ -1,3 +1,4 @@
+import { https } from 'firebase-functions'
 import express, {Express, Request, Response} from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -69,4 +70,5 @@ app.listen(port, () => {
 console.log(`[server]: Server is running at http://localhost:${port}`);
 });
 
-export default app;
+// export default app;
+export const api = https.onRequest(app);

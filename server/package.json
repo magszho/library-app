@@ -6,7 +6,10 @@
   "type": "commonjs",
   "scripts": {
     "start": "ts-node src/app.ts",
-    "dev": "nodemon --exec ts-node src/app.ts"
+    "dev": "nodemon --exec ts-node src/app.ts",
+    "build": "spack && npm run static && npm run prerender",
+    "static": "cp static/* dist",
+    "prerender": "ts-node prerender.ts"
   },
   "keywords": [],
   "author": "",
