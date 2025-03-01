@@ -23,18 +23,6 @@ try {
 });
 
 userRouter.get('/users', async (req: Request<{}, {}, {}, {email?: string}>, res: Response): Promise<void> => {
-    // const { email } = req.query;
-    // try {
-    //     const user = await User.findOne({ email: email }).exec();
-    //     if (!user) {
-    //         res.status(404).send({ message: 'User not found' });
-    //             return;
-    //     }
-    //     res.status(200).json(user);
-    // } catch (error) {
-    //     res.status(500).send({ error: 'Error occurred while finding user' });
-    // }
-
     try {
         let query = {};
         if (req.query.email) {
@@ -43,7 +31,7 @@ userRouter.get('/users', async (req: Request<{}, {}, {}, {email?: string}>, res:
         const users = await User.find(query).exec();
         res.status(200).json(users);
     } catch (error) {
-        res.status(400).json({ error: 'FError ocurred while finding user' });
+        res.status(400).json({ error: 'Error ocurred while finding user' });
     }
 });
 
